@@ -1,0 +1,107 @@
+name: 'Publish iOS Application to Appstore'
+description: 'Publish iOS Application to Testflight'
+author: 'UmutSERIFLER'
+branding:
+  icon: 'cast'
+  color: 'green'
+inputs:
+  projectName:
+    description: "Project name is an input that will be used for action"
+    required: true
+  certificateBase64:
+    required: true
+  p12FilePassword:
+    required: true
+  provisionProfileBase64:
+    required: true
+  keychainPassword:
+    required: true
+  appstoreAPIKey:
+    required: true
+  appstoreAPIKeyID:
+    required: true
+  appstoreAPIIssuer:
+    required: true
+  teamID:
+    required: true
+  mobileProvision:
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Clean Project
+      run: |
+        xcodebuild clean -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS'
+      shell: bash
+    - name: Build for Testing
+      run: |
+        xcodebuild build-for-testing -scheme ${{ inputs.projectName }} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14 Pro,OS=16.2'
+      shell: bash
+    - name: Test Without Building
+      run: |
+        xcodebuild test-without-building -scheme ${{ inputs.projectName }} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14 Pro,OS=16.2'
+      shell: bash
+    - name: Install the Apple certificate and provisioning profile
+      run: |
+          # create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # import certificate and provisioning profile from secrets
+          echo -n "${{ inputs.certificateBase64 }}" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "${{ inputs.provisionProfileBase64 }}" | base64 --decode -o $PP_PATH
+
+          # create temporary keychain
+          security create-keychain -p "${{ inputs.keychainPassword }}" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "${{ inputs.keychainPassword }}" $KEYCHAIN_PATH
+
+          # import certificate to keychain
+          security import $CERTIFICATE_PATH -P "${{ inputs.p12FilePassword }}" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # apply provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+        shell: bash
+    - name: Clean Project
+      run: |
+          xcodebuild clean -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -configuration Release
+      shell: bash
+    - name: Build Project
+      run: |
+          xcodebuild build -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -allowProvisioningUpdates -configuration Release
+      shell: bash
+    - name: Archive Project
+      run: |
+          xcodebuild archive -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -archivePath ./build/archive/${{ inputs.projectName }}.xcarchive
+      shell: bash
+    - name: Import Data to Plist & Increase Build Number
+      run: |
+          plutil -insert method -string app-store ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
+          plutil -insert provisioningProfiles -json '{"${{ inputs.teamID }}":"${{ inputs.mobileProvision }}"}' ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
+          oldVersion=$(plutil -extract "ApplicationProperties.CFBundleVersion" raw ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist)
+          newVersion="$(($oldVersion+1))"
+          echo New Version $newVersion
+          plutil -replace "ApplicationProperties.CFBundleVersion" -string "$newVersion" ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
+          plutil -p ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
+      shell: bash
+    - name: Export Archive
+      run: |
+          xcodebuild -exportArchive -archivePath ./build/archive/${{ inputs.projectName }}.xcarchive -exportPath $RUNNER_TEMP/export -exportOptionsPlist ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist -configuration Release -allowProvisioningUpdates
+      shell: bash
+    - name: Authentication Keys Decode Step
+      run: |
+         mkdir -p ~/private_keys
+         echo -n "${{ inputs.appstoreAPIKey }}" | base64 --decode --o ~/private_keys/AuthKey_${{ inputs.appstoreAPIKeyID }}.p8
+         echo "Private Key has been implemented"
+      shell: bash
+    - name: Validate App
+      run: |
+         xcrun altool --validate-app -f /Users/runner/work/_temp/export/${{ inputs.projectName }}.ipa -t ios --apiKey ${{ inputs.appstoreAPIKeyID }} --apiIssuer ${{ inputs.appstoreAPIIssuer }} --show-progress --verbose --output-format json
+      shell: bash
+    - name: Upload App
+      run: |
+         xcrun altool --upload-app -f /Users/runner/work/_temp/export/${{ inputs.projectName }}.ipa -t ios --apiKey ${{ inputs.appstoreAPIKeyID }} --apiIssuer ${{ inputs.appstoreAPIIssuer }} --show-progress --verbose --output-format json
+      shell: bash
