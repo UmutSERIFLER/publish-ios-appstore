@@ -1,4 +1,4 @@
-name: 'Publish iOS Application to Appstore without Building iOS Application'
+name: 'Publish iOS Application to Appstore'
 description: 'Publish iOS Application to Testflight'
 author: 'UmutSERIFLER'
 branding:
