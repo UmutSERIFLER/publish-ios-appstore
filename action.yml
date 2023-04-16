@@ -42,7 +42,7 @@ runs:
         xcodebuild test-without-building -scheme ${{ inputs.projectName }} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14 Pro,OS=16.2'
       shell: bash
     - name: Install the Apple certificate and provisioning profile
-        run: |
+      run: |
           # create variables
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
@@ -65,20 +65,20 @@ runs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
         shell: bash
-      - name: Clean Project
-        run: |
+    - name: Clean Project
+      run: |
           xcodebuild clean -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -configuration Release
-        shell: bash
-      - name: Build Project
-        run: |
+      shell: bash
+    - name: Build Project
+      run: |
           xcodebuild build -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -allowProvisioningUpdates -configuration Release
-        shell: bash
-      - name: Archive Project
-        run: |
+      shell: bash
+    - name: Archive Project
+      run: |
           xcodebuild archive -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -archivePath ./build/archive/${{ inputs.projectName }}.xcarchive
-        shell: bash
-      - name: Import Data to Plist & Increase Build Number
-        run: |
+      shell: bash
+    - name: Import Data to Plist & Increase Build Number
+      run: |
           plutil -insert method -string app-store ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
           plutil -insert provisioningProfiles -json '{"${{ inputs.teamID }}":"${{ inputs.mobileProvision }}"}' ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
           oldVersion=$(plutil -extract "ApplicationProperties.CFBundleVersion" raw ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist)
@@ -86,22 +86,22 @@ runs:
           echo New Version $newVersion
           plutil -replace "ApplicationProperties.CFBundleVersion" -string "$newVersion" ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
           plutil -p ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
-        shell: bash
-      - name: Export Archive
-        run: |
+      shell: bash
+    - name: Export Archive
+      run: |
           xcodebuild -exportArchive -archivePath ./build/archive/${{ inputs.projectName }}.xcarchive -exportPath $RUNNER_TEMP/export -exportOptionsPlist ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist -configuration Release -allowProvisioningUpdates
-        shell: bash
-      - name: Authentication Keys Decode Step
-        run: |
+      shell: bash
+    - name: Authentication Keys Decode Step
+      run: |
          mkdir -p ~/private_keys
          echo -n "${{ inputs.appstoreAPIKey }}" | base64 --decode --o ~/private_keys/AuthKey_${{ inputs.appstoreAPIKeyID }}.p8
          echo "Private Key has been implemented"
-        shell: bash
-      - name: Validate App
-        run: |
+      shell: bash
+    - name: Validate App
+      run: |
          xcrun altool --validate-app -f /Users/runner/work/_temp/export/${{ inputs.projectName }}.ipa -t ios --apiKey ${{ inputs.appstoreAPIKeyID }} --apiIssuer ${{ inputs.appstoreAPIIssuer }} --show-progress --verbose --output-format json
-        shell: bash
-      - name: Upload App
-        run: |
+      shell: bash
+    - name: Upload App
+      run: |
          xcrun altool --upload-app -f /Users/runner/work/_temp/export/${{ inputs.projectName }}.ipa -t ios --apiKey ${{ inputs.appstoreAPIKeyID }} --apiIssuer ${{ inputs.appstoreAPIIssuer }} --show-progress --verbose --output-format json
-        shell: bash
+      shell: bash
