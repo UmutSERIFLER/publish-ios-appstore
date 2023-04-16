@@ -64,7 +64,7 @@ runs:
           # apply provisioning profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
-        shell: bash
+      shell: bash
     - name: Clean Project
       run: |
           xcodebuild clean -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -configuration Release
