@@ -9,22 +9,31 @@ inputs:
     description: "Project name is an input that will be used for action"
     required: true
   certificateBase64:
+    description: "Encrypted certificate Base64"
     required: true
   p12FilePassword:
+    description: "Password is used for p12"
     required: true
   provisionProfileBase64:
+    description: "Provision Profile is encrypted Base64"
     required: true
   keychainPassword:
+    description: "Keychain Password to save p12 file"
     required: true
   appstoreAPIKey:
+    description: "AppStore API Key to upload app"
     required: true
   appstoreAPIKeyID:
+    description: "AppStore API Key ID to upload app"
     required: true
   appstoreAPIIssuer:
+    description: "AppStore API Key Issuer to upload app"
     required: true
   teamID:
+    description: "Team ID for app group"
     required: true
   mobileProvision:
+    description: "Mobile Provision Name"
     required: true
 runs:
   using: 'composite'
