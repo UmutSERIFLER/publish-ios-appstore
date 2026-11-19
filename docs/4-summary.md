@@ -39,8 +39,12 @@
   `manageAppVersionAndBuildNumber` is off, so Xcode does not rewrite the number.
 - **Profile parsing:** profiles split on commas or newlines first, and the whole input is
   decoded as one profile only as a fallback. Two unpadded base64 profiles joined together
-  still decode, and `security cms` would then silently drop the second profile. A test
-  covers this case.
+  still decode, and the second profile would then be silently dropped. A test covers this
+  case.
+- **Profiles are decoded with `/usr/bin/openssl smime`, not `security cms -D`.** The latter
+  needs a default keychain, which service accounts on self-hosted runners often lack. CI's
+  keychain integration test caught this. The new path was checked against 10 real
+  Apple-signed profiles.
 - **Every v1 input still works.** `mobileProvision` is ignored with a warning, because the
   profile itself has a reliable name.
 
