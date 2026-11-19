@@ -43,7 +43,7 @@ plist_value() {
   /usr/libexec/PlistBuddy -c "Print :$2" "$1"
 }
 
-# Builds a CMS-signed plist that `security cms -D` decodes like a real
+# Builds a CMS-signed plist that decodes like a real
 # .mobileprovision. /usr/bin/openssl (LibreSSL) is used on purpose: its PKCS#12
 # output stays importable by `security import`, unlike OpenSSL 3 defaults.
 make_profile() {

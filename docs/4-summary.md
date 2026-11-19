@@ -8,7 +8,7 @@
   simulator selection, API key and profile decoding, and ExportOptions generation.
 - Steps: setup → signing → run-tests → archive → export → upload → cleanup (`if: always()`).
 - New outputs: `ipaPath`, `archivePath` and `buildNumber`.
-- Tests (`make test`): 50 bash tests that stub `xcodebuild` and `xcrun`, plus one keychain
+- Tests (`make test`): 51 bash tests that stub `xcodebuild` and `xcrun`, plus one keychain
   integration test that runs only on CI. CI (`.github/workflows/ci.yml`) runs shellcheck and
   actionlint on Ubuntu and the tests on macOS.
 

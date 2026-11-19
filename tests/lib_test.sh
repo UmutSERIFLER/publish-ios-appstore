@@ -150,6 +150,15 @@ test_decode_profiles_rejects_invalid_profile() {
   assert_fails decode_profiles "$(printf 'garbage' | base64)" "$TEST_TMP/out"
 }
 
+test_profiles_decode_without_a_default_keychain() {
+  # Service accounts on self-hosted runners often have no default keychain.
+  make_profile "$TEST_TMP/app.mobileprovision" "App Store App" "UUID-APP" "$TEAM" "$TEAM.com.example.app"
+  mkdir -p "$TEST_TMP/empty-home"
+  HOME="$TEST_TMP/empty-home"
+  decode_profiles "$(b64 "$TEST_TMP/app.mobileprovision")" "$TEST_TMP/out"
+  assert_eq "UUID-APP" "$(read_profile "$TEST_TMP/out/profile-0.mobileprovision" | cut -f4)"
+}
+
 test_read_profile_extracts_bundle_name_team_and_uuid() {
   make_profile "$TEST_TMP/app.mobileprovision" "App Store App" "UUID-APP" "$TEAM" "$TEAM.com.example.app"
   assert_eq "com.example.app	App Store App	$TEAM	UUID-APP" "$(read_profile "$TEST_TMP/app.mobileprovision")"

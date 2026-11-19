@@ -110,10 +110,18 @@ write_api_key() {
   printf '%s\n' "$path"
 }
 
+# Prints the plist embedded in a signed .mobileprovision. Not `security cms -D`:
+# it needs a default keychain, which service accounts on self-hosted runners
+# often lack. The system LibreSSL ships with every macOS; the signature chain
+# is not verified because Xcode validates the profile when it signs.
+profile_plist() {
+  /usr/bin/openssl smime -verify -noverify -inform der -in "$1" 2>/dev/null
+}
+
 decode_profile_to() {
   local encoded="$1" out="$2"
   printf '%s' "$encoded" | decode_base64 >"$out" 2>/dev/null &&
-    security cms -D -i "$out" >/dev/null 2>&1
+    profile_plist "$out" >/dev/null
 }
 
 # Decodes each non-empty line into <out_dir>/profile-N.mobileprovision; fails
@@ -141,7 +149,7 @@ decode_profiles() {
     return 0
   fi
   # Splitting must win over joining: two unpadded profiles joined together
-  # still decode, and `security cms` would then silently drop the second one.
+  # may still decode, silently dropping the second one.
   decode_profile_lines "$input" "$out_dir" && return 0
   rm -f "$out_dir"/profile-*.mobileprovision
   # A single profile stored line-wrapped (GNU base64 default) only decodes whole.
@@ -152,7 +160,7 @@ decode_profiles() {
 read_profile() {
   local file="$1" plist app_id name team uuid
   plist="$(mktemp)"
-  security cms -D -i "$file" >"$plist" 2>/dev/null || {
+  profile_plist "$file" >"$plist" || {
     rm -f "$plist"
     fail "Cannot decode provisioning profile $file."
   }
