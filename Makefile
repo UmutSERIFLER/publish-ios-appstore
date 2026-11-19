@@ -1,4 +1,4 @@
-SHELL_FILES := scripts/*.sh tests/*.sh tests/stubs/*
+SHELL_FILES := scripts/*.sh .github/scripts/*.sh tests/*.sh tests/stubs/*
 
 .PHONY: check lint test
 
