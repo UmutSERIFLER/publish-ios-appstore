@@ -52,7 +52,7 @@ inputs:
     required: false
     default: ''
   teamID:
-    description: 'Apple Developer team ID. Read from the provisioning profile or the archive when empty.'
+    description: 'Apple Developer team ID. Sets DEVELOPMENT_TEAM for the archive; when empty, the project setting is kept and export reads it from the profile or archive.'
     required: false
     default: ''
   mobileProvision:
@@ -117,6 +117,7 @@ runs:
         INPUT_BUILD_NUMBER: ${{ inputs.buildNumber }}
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_MOBILE_PROVISION: ${{ inputs.mobileProvision }}
+        INPUT_TEAM_ID: ${{ inputs.teamID }}
         INPUT_API_KEY: ${{ inputs.appstoreAPIKey }}
         INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
         INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
@@ -156,6 +157,7 @@ runs:
         API_KEY_PATH: ${{ steps.setup.outputs.apiKeyPath }}
         INPUT_CONFIGURATION: ${{ inputs.configuration }}
         INPUT_VERSION: ${{ inputs.version }}
+        INPUT_TEAM_ID: ${{ inputs.teamID }}
         INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
         INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
         INPUT_EXTRA_ARGS: ${{ inputs.extraXcodebuildArgs }}

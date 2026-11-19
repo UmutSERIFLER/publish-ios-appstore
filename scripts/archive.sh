@@ -21,6 +21,11 @@ args=(
   # Applies to the app and its extensions, which must share CFBundleVersion.
   "CURRENT_PROJECT_VERSION=${BUILD_NUMBER:?}"
 )
+# Without it, automatically signed projects that never saved a team fail to
+# archive; when empty the project's own DEVELOPMENT_TEAM is kept.
+if [[ -n "${INPUT_TEAM_ID:-}" ]]; then
+  args+=("DEVELOPMENT_TEAM=$INPUT_TEAM_ID")
+fi
 if [[ -n "${INPUT_VERSION:-}" ]]; then
   args+=("MARKETING_VERSION=$INPUT_VERSION")
 fi

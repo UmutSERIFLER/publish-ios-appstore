@@ -17,6 +17,10 @@ build_number="$(resolve_build_number "${INPUT_BUILD_NUMBER:-}" "${GITHUB_RUN_NUM
 if [[ -n "${INPUT_VERSION:-}" ]] && ! is_bundle_version "$INPUT_VERSION"; then
   fail "version '$INPUT_VERSION' must be one to three period-separated integers, e.g. 2.1.0."
 fi
+team_pattern='^[A-Z0-9]{10}$'
+if [[ -n "${INPUT_TEAM_ID:-}" && ! "$INPUT_TEAM_ID" =~ $team_pattern ]]; then
+  fail "teamID '$INPUT_TEAM_ID' must be the 10-character Apple Developer team ID, e.g. ABCDE12345."
+fi
 if [[ -n "${INPUT_MOBILE_PROVISION:-}" ]]; then
   warn "mobileProvision is deprecated and ignored: profile names are read from provisionProfileBase64."
 fi

@@ -25,7 +25,7 @@ step_output() {
 
 setup_env() {
   export INPUT_PROJECT_NAME="App" INPUT_WORKSPACE="" INPUT_PROJECT="" INPUT_SCHEME=""
-  export INPUT_BUILD_NUMBER="" INPUT_VERSION="" INPUT_MOBILE_PROVISION=""
+  export INPUT_BUILD_NUMBER="" INPUT_VERSION="" INPUT_MOBILE_PROVISION="" INPUT_TEAM_ID=""
   export INPUT_API_KEY="$PEM_KEY" INPUT_API_KEY_ID="KEY123" INPUT_API_ISSUER="issuer-uuid"
   export GITHUB_RUN_NUMBER="57"
 }
@@ -65,6 +65,13 @@ test_setup_fails_on_invalid_version() {
   use_stubs
   setup_env
   INPUT_VERSION="1.0-beta"
+  assert_fails run_step setup.sh
+}
+
+test_setup_fails_on_malformed_team_id() {
+  use_stubs
+  setup_env
+  export INPUT_TEAM_ID="my team"
   assert_fails run_step setup.sh
 }
 
@@ -142,12 +149,20 @@ test_archive_stamps_versions_and_authenticates_with_api_key() {
   assert_eq "$WORK_DIR/App.xcarchive" "$(step_output archivePath)"
 }
 
-test_archive_omits_marketing_version_when_not_set() {
+test_archive_omits_marketing_version_and_team_when_not_set() {
   use_stubs
   xcode_env
-  export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION=""
+  export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION="" INPUT_TEAM_ID=""
   run_step archive.sh
-  if grep -q MARKETING_VERSION "$TEST_TMP/xcodebuild.log"; then return 1; fi
+  if grep -q -e MARKETING_VERSION -e DEVELOPMENT_TEAM "$TEST_TMP/xcodebuild.log"; then return 1; fi
+}
+
+test_archive_passes_team_id_for_automatic_signing() {
+  use_stubs
+  xcode_env
+  export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION="" INPUT_TEAM_ID="ABCDE12345"
+  run_step archive.sh
+  assert_contains "$(cat "$TEST_TMP/xcodebuild.log")" "CURRENT_PROJECT_VERSION=57 DEVELOPMENT_TEAM=ABCDE12345"
 }
 
 test_archive_warns_when_build_number_is_not_applied() {
