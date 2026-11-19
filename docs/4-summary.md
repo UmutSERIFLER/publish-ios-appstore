@@ -6,11 +6,19 @@
   its inputs through `env:`, so there is no `${{ }}` inside shell code.
 - `scripts/lib.sh` holds the pure helpers: container/scheme/build-number resolution,
   simulator selection, API key and profile decoding, and ExportOptions generation.
-- Steps: setup → signing → run-tests → archive → export → upload → cleanup (`if: always()`).
-- New outputs: `ipaPath`, `archivePath` and `buildNumber`.
-- Tests (`make test`): 51 bash tests that stub `xcodebuild` and `xcrun`, plus one keychain
-  integration test that runs only on CI. CI (`.github/workflows/ci.yml`) runs shellcheck and
-  actionlint on Ubuntu and the tests on macOS.
+- Steps: setup → signing → run-tests → archive → export → upload → tag (opt-in) → cleanup
+  (`if: always()`).
+- New outputs: `ipaPath`, `archivePath`, `buildNumber` and `gitTag`.
+- Tagging, in two places:
+  - **Action:** `gitTag: true` pushes an annotated tag (default `ios-v{version}-{build}`) for
+    the uploaded commit. It reads the values from the archive and never moves an existing tag.
+  - **This repo:** `.github/workflows/release.yml` runs CI on every published release, then
+    moves the floating major tag (`v2`). Prereleases and older hotfixes never move it.
+- README rewritten as the Marketplace page, with Mermaid diagrams for the pipeline, signing
+  modes, version/build/tag mapping and the release flow.
+- Tests (`make test`): 73 bash tests that stub `xcodebuild`, `xcrun` and use local git
+  remotes, plus one keychain integration test that runs only on CI. CI
+  (`.github/workflows/ci.yml`) runs shellcheck and actionlint on Ubuntu and the tests on macOS.
 
 ## v1 bugs fixed
 
@@ -23,7 +31,7 @@
 | Inputs interpolated into shell (injection, quoting bugs) | Inputs passed only through `env:`; a metadata test enforces this |
 | No partition list, so codesign could hang on a keychain prompt | `security set-key-partition-list` |
 | Profiles not installed where Xcode 16+ looks for them | Installed in both directories, named by UUID |
-| Keychain, profiles and `.p8` left on self-hosted runners | Cleanup step always runs; it removes only files it created |
+| Keychain and `.p8` left on self-hosted runners | Cleanup step always runs and deletes the run's keychain and key |
 | No workspace/scheme support, duplicate clean/build steps | `workspace`/`project`/`scheme` inputs, one `clean archive` |
 
 ## Decisions and trade-offs
@@ -45,6 +53,18 @@
   needs a default keychain, which service accounts on self-hosted runners often lack. CI's
   keychain integration test caught this. The new path was checked against 10 real
   Apple-signed profiles.
+- **Provisioning profiles are kept after a run** (from PR review). They hold no secrets, and
+  deleting them raced with parallel runs under the same macOS user. They are installed
+  atomically (temp file + rename) and only by UUID. Ref-counting with locks was rejected as
+  too much machinery for removing non-secret files.
+- **`teamID` is forwarded as `DEVELOPMENT_TEAM`** (from PR review), only when set, so
+  automatic signing works for projects without a saved team.
+- **The test runner fails on test files it cannot load** (from PR review). Discovery runs in a
+  separate bash process: `set -e` is ignored inside functions called from `if`, and `source`
+  returns only the last command's status.
+- **Not done (PR review):** isolating signing identities that Xcode creates during automatic
+  signing on self-hosted runners. Changing the default keychain would race across parallel
+  jobs; the README documents it and recommends manual signing on shared Macs.
 - **Every v1 input still works.** `mobileProvision` is ignored with a warning, because the
   profile itself has a reliable name.
 
@@ -61,8 +81,12 @@
 
 - Release (maintainer, in the GitHub UI): after merging, draft a release with tag `v2.0.0`,
   tick **Publish this Action to the GitHub Marketplace**, choose the *Deployment* and
-  *Mobile* categories and publish. Then point the major tag at it:
-  `git tag -f v2 v2.0.0 && git push -f origin v2`.
+  *Mobile* categories and publish. The Release workflow then creates or moves `v2`. The
+  Marketplace checkbox exists only in the UI, so this step cannot be automated.
+- The keychain search list is shared per macOS user, and two runners under one user can race
+  when they update it. A lock around that update would remove the race; for now the README
+  recommends one macOS user per runner.
+- The Mermaid diagrams were not rendered locally; check them in the PR's README view.
 - Run an end-to-end smoke test against a sample app with real signing secrets
   (`uploadApp: false`).
 - Optional: an `--upload-package --wait` mode once Xcode 16 runners are retired.
