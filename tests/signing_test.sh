@@ -1,9 +1,9 @@
 # shellcheck shell=bash
 # Exercises the real `security` keychain flow with the runner's real HOME,
 # exactly as the action runs. It mutates the user's keychain search list and
-# provisioning profile folders, so it only runs on throwaway CI runners.
+# installs provisioning profiles, so it only runs on throwaway CI runners.
 
-test_signing_installs_certificate_and_profiles_then_cleanup_removes_them() {
+test_signing_installs_certificate_and_profiles_then_cleanup_removes_keychain() {
   [[ "${CI:-}" == "true" ]] || skip "needs a disposable macOS runner (set CI=true)"
 
   local team="ABCDE12345" work_dir="$TEST_TMP/work" app_uuid widget_uuid keychains_before
@@ -42,6 +42,7 @@ test_signing_installs_certificate_and_profiles_then_cleanup_removes_them() {
 
   assert_eq "$keychains_before" "$(security list-keychains -d user)"
   [[ ! -e "$keychain" ]]
-  [[ ! -e "$legacy_app" ]]
-  [[ ! -e "$xcode16_widget" ]]
+  # Shared with concurrent runs and secret-free, so deliberately left installed.
+  assert_file_exists "$legacy_app"
+  assert_file_exists "$xcode16_widget"
 }

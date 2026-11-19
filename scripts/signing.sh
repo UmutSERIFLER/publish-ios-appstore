@@ -9,7 +9,6 @@ source "$(dirname "$0")/lib.sh"
 : "${WORK_DIR:?WORK_DIR is not set}"
 KEYCHAIN_PATH="$WORK_DIR/signing.keychain-db"
 PROFILES_TSV="$WORK_DIR/profiles.tsv"
-INSTALLED_PROFILES="$WORK_DIR/installed-profiles.txt"
 
 create_keychain() {
   local password="$1"
@@ -49,8 +48,21 @@ install_certificate() {
   echo "Imported signing certificate into $KEYCHAIN_PATH."
 }
 
+# Profiles are shared by every job running under this macOS user and hold no
+# secrets (the private key lives in the per-run keychain), so they are
+# installed idempotently and never removed: deleting one could break a
+# concurrent run that is still archiving or exporting with it.
+install_profile_file() {
+  local source="$1" destination="$2" staging
+  [[ ! -e "$destination" ]] || return 0
+  # Copy then rename so a concurrent run never reads a half-written profile.
+  staging="$(mktemp "$destination.XXXXXX")"
+  cp "$source" "$staging"
+  mv -f "$staging" "$destination"
+}
+
 install_profiles() {
-  local decoded_dir="$WORK_DIR/profiles" profile metadata uuid dir destination
+  local decoded_dir="$WORK_DIR/profiles" profile metadata uuid dir
   decode_profiles "$INPUT_PROVISION_PROFILE" "$decoded_dir"
   : >"$PROFILES_TSV"
 
@@ -60,12 +72,7 @@ install_profiles() {
     uuid="$(printf '%s' "$metadata" | cut -f4)"
     for dir in "${PROFILE_DIRS[@]}"; do
       mkdir -p "$dir"
-      destination="$dir/$uuid.mobileprovision"
-      # Only files we create are removed by cleanup; pre-installed ones stay.
-      if [[ ! -e "$destination" ]]; then
-        cp "$profile" "$destination"
-        printf '%s\n' "$destination" >>"$INSTALLED_PROFILES"
-      fi
+      install_profile_file "$profile" "$dir/$uuid.mobileprovision"
     done
     echo "Installed profile '$(printf '%s' "$metadata" | cut -f2)' for $(printf '%s' "$metadata" | cut -f1)."
   done

@@ -84,6 +84,33 @@ test_setup_warns_that_mobile_provision_is_deprecated() {
 
 # --- signing.sh ------------------------------------------------------------
 
+install_profile_for_run() {
+  WORK_DIR="$TEST_TMP/$1" INPUT_CERTIFICATE="" INPUT_PROVISION_PROFILE="$2" run_step signing.sh >/dev/null
+}
+
+test_signing_installs_profiles_by_uuid_in_both_xcode_folders() {
+  use_stubs
+  export HOME="$TEST_TMP/home"
+  mkdir -p "$TEST_TMP/run-a"
+  make_profile "$TEST_TMP/app.mobileprovision" "App Store App" "UUID-APP" "ABCDE12345" "ABCDE12345.com.example.app"
+  install_profile_for_run run-a "$(b64 "$TEST_TMP/app.mobileprovision")"
+  assert_file_exists "$HOME/Library/MobileDevice/Provisioning Profiles/UUID-APP.mobileprovision"
+  assert_file_exists "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/UUID-APP.mobileprovision"
+  assert_eq "com.example.app	App Store App	ABCDE12345	UUID-APP" "$(cat "$TEST_TMP/run-a/profiles.tsv")"
+  assert_eq "teamId=ABCDE12345" "$(grep '^teamId=' "$GITHUB_OUTPUT")"
+}
+
+test_cleanup_keeps_profiles_a_concurrent_run_still_needs() {
+  use_stubs
+  export HOME="$TEST_TMP/home"
+  mkdir -p "$TEST_TMP/run-a" "$TEST_TMP/run-b"
+  make_profile "$TEST_TMP/app.mobileprovision" "App Store App" "UUID-APP" "ABCDE12345" "ABCDE12345.com.example.app"
+  install_profile_for_run run-a "$(b64 "$TEST_TMP/app.mobileprovision")"
+  install_profile_for_run run-b "$(b64 "$TEST_TMP/app.mobileprovision")"
+  WORK_DIR="$TEST_TMP/run-a" run_step cleanup.sh >/dev/null
+  assert_file_exists "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/UUID-APP.mobileprovision"
+}
+
 test_signing_is_skipped_without_certificate_or_profile() {
   use_stubs
   xcode_env
@@ -271,14 +298,13 @@ test_upload_fails_when_altool_fails() {
 test_cleanup_removes_secrets_but_keeps_build_products() {
   use_stubs
   xcode_env
-  mkdir -p "$WORK_DIR/private_keys" "$WORK_DIR/export" "$TEST_TMP/profiles"
+  mkdir -p "$WORK_DIR/private_keys" "$WORK_DIR/export"
   : >"$API_KEY_PATH"
   : >"$WORK_DIR/export/My App.ipa"
-  : >"$TEST_TMP/profiles/UUID.mobileprovision"
-  printf '%s\n' "$TEST_TMP/profiles/UUID.mobileprovision" >"$WORK_DIR/installed-profiles.txt"
+  : >"$WORK_DIR/certificate.p12"
   run_step cleanup.sh
   [[ ! -e "$WORK_DIR/private_keys" ]]
-  [[ ! -e "$TEST_TMP/profiles/UUID.mobileprovision" ]]
+  [[ ! -e "$WORK_DIR/certificate.p12" ]]
   assert_file_exists "$WORK_DIR/export/My App.ipa"
 }
 
