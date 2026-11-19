@@ -87,6 +87,14 @@ inputs:
     description: 'Upload the .ipa to App Store Connect. Set to false to only build the .ipa.'
     required: false
     default: 'true'
+  gitTag:
+    description: 'After a successful upload, push a git tag for the built commit. Needs `permissions: contents: write`.'
+    required: false
+    default: 'false'
+  gitTagName:
+    description: 'Tag name template for gitTag; {version} and {build} are replaced. Defaults to ios-v{version}-{build}.'
+    required: false
+    default: ''
   extraXcodebuildArgs:
     description: 'Extra space-separated arguments for xcodebuild test/archive, e.g. -skipMacroValidation.'
     required: false
@@ -102,6 +110,9 @@ outputs:
   buildNumber:
     description: 'Build number (CFBundleVersion) stamped on the build.'
     value: ${{ steps.setup.outputs.buildNumber }}
+  gitTag:
+    description: 'Git tag pushed for the uploaded commit (empty unless gitTag is true).'
+    value: ${{ steps.tag.outputs.gitTag }}
 
 runs:
   using: 'composite'
@@ -187,6 +198,16 @@ runs:
         INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
         INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
       run: bash "$GITHUB_ACTION_PATH/scripts/upload.sh"
+
+    - name: Tag the uploaded commit
+      id: tag
+      shell: bash
+      env:
+        ARCHIVE_PATH: ${{ steps.archive.outputs.archivePath }}
+        INPUT_GIT_TAG: ${{ inputs.gitTag }}
+        INPUT_GIT_TAG_NAME: ${{ inputs.gitTagName }}
+        INPUT_UPLOAD_APP: ${{ inputs.uploadApp }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/tag.sh"
 
     - name: Remove signing assets and API key
       if: always()

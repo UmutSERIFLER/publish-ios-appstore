@@ -81,3 +81,25 @@ make_p12() {
 b64() {
   base64 <"$1" | tr -d '\n'
 }
+
+# Creates $TEST_TMP/repo (main branch) cloned from bare $TEST_TMP/origin.git.
+# The developer's git config is ignored, so signing hooks cannot interfere.
+make_git_repo() {
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  export GIT_AUTHOR_NAME="Test" GIT_AUTHOR_EMAIL="test@example.com"
+  export GIT_COMMITTER_NAME="Test" GIT_COMMITTER_EMAIL="test@example.com"
+  git init -q --bare -b main "$TEST_TMP/origin.git"
+  git init -q -b main "$TEST_TMP/repo"
+  git -C "$TEST_TMP/repo" remote add origin "$TEST_TMP/origin.git"
+}
+
+# Commits on $TEST_TMP/repo, pushes main and prints the new commit id.
+git_commit() {
+  git -C "$TEST_TMP/repo" commit -q --allow-empty -m "$1"
+  git -C "$TEST_TMP/repo" push -q origin main
+  git -C "$TEST_TMP/repo" rev-parse HEAD
+}
+
+remote_tag_commit() {
+  git --git-dir "$TEST_TMP/origin.git" rev-parse -q --verify "refs/tags/$1^{commit}" || true
+}
