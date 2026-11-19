@@ -1,116 +1,194 @@
 name: 'Publish iOS Application to Appstore'
-description: 'Publish iOS Application to Testflight'
+description: 'Test, archive, sign and upload an iOS app to App Store Connect (TestFlight / App Store) with an API key.'
 author: 'UmutSERIFLER'
 branding:
-  icon: 'cast'
+  icon: 'upload-cloud'
   color: 'green'
+
 inputs:
   projectName:
-    description: "Project name is an input that will be used for action"
-    required: true
-  certificateBase64:
-    description: "Encrypted certificate Base64"
-    required: true
-  p12FilePassword:
-    description: "Password is used for p12"
-    required: true
-  provisionProfileBase64:
-    description: "Provision Profile is encrypted Base64"
-    required: true
-  keychainPassword:
-    description: "Keychain Password to save p12 file"
-    required: true
+    description: 'Xcode project name without extension. Used as the default for `project` (<projectName>.xcodeproj) and `scheme`.'
+    required: false
+    default: ''
+  workspace:
+    description: 'Path to an .xcworkspace (e.g. CocoaPods). Takes precedence over `project`.'
+    required: false
+    default: ''
+  project:
+    description: 'Path to the .xcodeproj. Defaults to <projectName>.xcodeproj.'
+    required: false
+    default: ''
+  scheme:
+    description: 'Scheme to test and archive. Defaults to `projectName`.'
+    required: false
+    default: ''
+  configuration:
+    description: 'Build configuration used for the archive.'
+    required: false
+    default: 'Release'
   appstoreAPIKey:
-    description: "AppStore API Key to upload app"
+    description: 'App Store Connect API private key: the contents of AuthKey_<id>.p8 or its base64 encoding.'
     required: true
   appstoreAPIKeyID:
-    description: "AppStore API Key ID to upload app"
+    description: 'App Store Connect API key ID.'
     required: true
   appstoreAPIIssuer:
-    description: "AppStore API Key Issuer to upload app"
+    description: 'App Store Connect API issuer ID.'
     required: true
+  certificateBase64:
+    description: 'Base64 of the Apple Distribution .p12 certificate. Omit to let Xcode sign automatically with the API key.'
+    required: false
+    default: ''
+  p12FilePassword:
+    description: 'Password of the .p12 certificate.'
+    required: false
+    default: ''
+  provisionProfileBase64:
+    description: 'Base64 of the App Store provisioning profile(s). Separate several profiles (app extensions) with commas or newlines.'
+    required: false
+    default: ''
+  keychainPassword:
+    description: 'Password for the temporary keychain. A random one is generated when empty.'
+    required: false
+    default: ''
   teamID:
-    description: "Team ID for app group"
-    required: true
+    description: 'Apple Developer team ID. Read from the provisioning profile or the archive when empty.'
+    required: false
+    default: ''
   mobileProvision:
-    description: "Mobile Provision Name"
-    required: true
+    description: 'Deprecated and ignored: profile names are read from provisionProfileBase64.'
+    required: false
+    default: ''
+  buildNumber:
+    description: 'CFBundleVersion to stamp on the build (sets CURRENT_PROJECT_VERSION). Defaults to github.run_number.'
+    required: false
+    default: ''
+  version:
+    description: 'CFBundleShortVersionString to stamp on the build (sets MARKETING_VERSION). Keeps the project value when empty.'
+    required: false
+    default: ''
+  runTests:
+    description: 'Run the scheme tests on a simulator before archiving.'
+    required: false
+    default: 'true'
+  testDestination:
+    description: 'xcodebuild -destination for tests. Defaults to the newest available iPhone simulator.'
+    required: false
+    default: ''
+  exportMethod:
+    description: 'ExportOptions method. Use `app-store` on Xcode older than 15.3.'
+    required: false
+    default: 'app-store-connect'
+  validateApp:
+    description: 'Validate the .ipa with App Store Connect before uploading.'
+    required: false
+    default: 'true'
+  uploadApp:
+    description: 'Upload the .ipa to App Store Connect. Set to false to only build the .ipa.'
+    required: false
+    default: 'true'
+  extraXcodebuildArgs:
+    description: 'Extra space-separated arguments for xcodebuild test/archive, e.g. -skipMacroValidation.'
+    required: false
+    default: ''
+
+outputs:
+  ipaPath:
+    description: 'Absolute path of the exported .ipa.'
+    value: ${{ steps.export.outputs.ipaPath }}
+  archivePath:
+    description: 'Absolute path of the .xcarchive.'
+    value: ${{ steps.archive.outputs.archivePath }}
+  buildNumber:
+    description: 'Build number (CFBundleVersion) stamped on the build.'
+    value: ${{ steps.setup.outputs.buildNumber }}
+
 runs:
   using: 'composite'
   steps:
-    - name: Clean Project
-      run: |
-        xcodebuild clean -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS'
+    - name: Validate inputs
+      id: setup
       shell: bash
-    - name: Build for Testing
-      run: |
-        xcodebuild build-for-testing -scheme ${{ inputs.projectName }} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14 Pro,OS=16.2'
-      shell: bash
-    - name: Test Without Building
-      run: |
-        xcodebuild test-without-building -scheme ${{ inputs.projectName }} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14 Pro,OS=16.2'
-      shell: bash
-    - name: Install the Apple certificate and provisioning profile
-      run: |
-          # create variables
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+      env:
+        INPUT_WORKSPACE: ${{ inputs.workspace }}
+        INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_PROJECT_NAME: ${{ inputs.projectName }}
+        INPUT_SCHEME: ${{ inputs.scheme }}
+        INPUT_BUILD_NUMBER: ${{ inputs.buildNumber }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_MOBILE_PROVISION: ${{ inputs.mobileProvision }}
+        INPUT_API_KEY: ${{ inputs.appstoreAPIKey }}
+        INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
+        INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/setup.sh"
 
-          # import certificate and provisioning profile from secrets
-          echo -n "${{ inputs.certificateBase64 }}" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "${{ inputs.provisionProfileBase64 }}" | base64 --decode -o $PP_PATH
+    - name: Install signing certificate and provisioning profiles
+      id: signing
+      shell: bash
+      env:
+        WORK_DIR: ${{ steps.setup.outputs.workDir }}
+        INPUT_CERTIFICATE: ${{ inputs.certificateBase64 }}
+        INPUT_P12_PASSWORD: ${{ inputs.p12FilePassword }}
+        INPUT_KEYCHAIN_PASSWORD: ${{ inputs.keychainPassword }}
+        INPUT_PROVISION_PROFILE: ${{ inputs.provisionProfileBase64 }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/signing.sh"
 
-          # create temporary keychain
-          security create-keychain -p "${{ inputs.keychainPassword }}" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "${{ inputs.keychainPassword }}" $KEYCHAIN_PATH
+    - name: Run tests
+      shell: bash
+      env:
+        CONTAINER_FLAG: ${{ steps.setup.outputs.containerFlag }}
+        CONTAINER_PATH: ${{ steps.setup.outputs.containerPath }}
+        SCHEME: ${{ steps.setup.outputs.scheme }}
+        INPUT_RUN_TESTS: ${{ inputs.runTests }}
+        INPUT_TEST_DESTINATION: ${{ inputs.testDestination }}
+        INPUT_EXTRA_ARGS: ${{ inputs.extraXcodebuildArgs }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/run-tests.sh"
 
-          # import certificate to keychain
-          security import $CERTIFICATE_PATH -P "${{ inputs.p12FilePassword }}" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+    - name: Archive
+      id: archive
+      shell: bash
+      env:
+        WORK_DIR: ${{ steps.setup.outputs.workDir }}
+        CONTAINER_FLAG: ${{ steps.setup.outputs.containerFlag }}
+        CONTAINER_PATH: ${{ steps.setup.outputs.containerPath }}
+        SCHEME: ${{ steps.setup.outputs.scheme }}
+        BUILD_NUMBER: ${{ steps.setup.outputs.buildNumber }}
+        API_KEY_PATH: ${{ steps.setup.outputs.apiKeyPath }}
+        INPUT_CONFIGURATION: ${{ inputs.configuration }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
+        INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
+        INPUT_EXTRA_ARGS: ${{ inputs.extraXcodebuildArgs }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/archive.sh"
 
-          # apply provisioning profile
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+    - name: Export .ipa
+      id: export
       shell: bash
-    - name: Clean Project
-      run: |
-          xcodebuild clean -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -configuration Release
+      env:
+        WORK_DIR: ${{ steps.setup.outputs.workDir }}
+        ARCHIVE_PATH: ${{ steps.archive.outputs.archivePath }}
+        API_KEY_PATH: ${{ steps.setup.outputs.apiKeyPath }}
+        PROFILE_TEAM_ID: ${{ steps.signing.outputs.teamId }}
+        INPUT_TEAM_ID: ${{ inputs.teamID }}
+        INPUT_EXPORT_METHOD: ${{ inputs.exportMethod }}
+        INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
+        INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/export.sh"
+
+    - name: Validate and upload to App Store Connect
       shell: bash
-    - name: Build Project
-      run: |
-          xcodebuild build -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -allowProvisioningUpdates -configuration Release
+      env:
+        WORK_DIR: ${{ steps.setup.outputs.workDir }}
+        IPA_PATH: ${{ steps.export.outputs.ipaPath }}
+        INPUT_VALIDATE_APP: ${{ inputs.validateApp }}
+        INPUT_UPLOAD_APP: ${{ inputs.uploadApp }}
+        INPUT_API_KEY_ID: ${{ inputs.appstoreAPIKeyID }}
+        INPUT_API_ISSUER: ${{ inputs.appstoreAPIIssuer }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/upload.sh"
+
+    - name: Remove signing assets and API key
+      if: always()
       shell: bash
-    - name: Archive Project
-      run: |
-          xcodebuild archive -project ${{ inputs.projectName }}.xcodeproj -scheme ${{ inputs.projectName }} -destination 'generic/platform=iOS' -archivePath ./build/archive/${{ inputs.projectName }}.xcarchive
-      shell: bash
-    - name: Import Data to Plist & Increase Build Number
-      run: |
-          plutil -insert method -string app-store ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
-          plutil -insert provisioningProfiles -json '{"${{ inputs.teamID }}":"${{ inputs.mobileProvision }}"}' ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
-          oldVersion=$(plutil -extract "ApplicationProperties.CFBundleVersion" raw ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist)
-          newVersion="$(($oldVersion+1))"
-          echo New Version $newVersion
-          plutil -replace "ApplicationProperties.CFBundleVersion" -string "$newVersion" ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
-          plutil -p ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist
-      shell: bash
-    - name: Export Archive
-      run: |
-          xcodebuild -exportArchive -archivePath ./build/archive/${{ inputs.projectName }}.xcarchive -exportPath $RUNNER_TEMP/export -exportOptionsPlist ./build/archive/${{ inputs.projectName }}.xcarchive/Info.plist -configuration Release -allowProvisioningUpdates
-      shell: bash
-    - name: Authentication Keys Decode Step
-      run: |
-         mkdir -p ~/private_keys
-         echo -n "${{ inputs.appstoreAPIKey }}" | base64 --decode --o ~/private_keys/AuthKey_${{ inputs.appstoreAPIKeyID }}.p8
-         echo "Private Key has been implemented"
-      shell: bash
-    - name: Validate App
-      run: |
-         xcrun altool --validate-app -f /Users/runner/work/_temp/export/${{ inputs.projectName }}.ipa -t ios --apiKey ${{ inputs.appstoreAPIKeyID }} --apiIssuer ${{ inputs.appstoreAPIIssuer }} --show-progress --verbose --output-format json
-      shell: bash
-    - name: Upload App
-      run: |
-         xcrun altool --upload-app -f /Users/runner/work/_temp/export/${{ inputs.projectName }}.ipa -t ios --apiKey ${{ inputs.appstoreAPIKeyID }} --apiIssuer ${{ inputs.appstoreAPIIssuer }} --show-progress --verbose --output-format json
-      shell: bash
+      env:
+        WORK_DIR: ${{ steps.setup.outputs.workDir }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/cleanup.sh"
