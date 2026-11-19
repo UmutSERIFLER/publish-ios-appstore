@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Test double for xcodebuild: logs each invocation (one line, %q-quoted) and
+# fakes the artifacts the step scripts read back.
+set -euo pipefail
+
+printf '%q ' "$@" >>"$TEST_TMP/xcodebuild.log"
+printf '\n' >>"$TEST_TMP/xcodebuild.log"
+
+value_after() {
+  local flag="$1"
+  shift
+  while [[ $# -gt 1 ]]; do
+    if [[ "$1" == "$flag" ]]; then
+      printf '%s\n' "$2"
+      return
+    fi
+    shift
+  done
+}
+
+case " $* " in
+  *" -showdestinations "*)
+    cat "${STUB_DESTINATIONS:-$TESTS_DIR/fixtures/showdestinations.txt}"
+    ;;
+  *" archive "*)
+    archive="$(value_after -archivePath "$@")"
+    build_number="${STUB_ARCHIVED_BUILD_NUMBER:-}"
+    if [[ -z "$build_number" ]]; then
+      for arg in "$@"; do
+        [[ "$arg" != CURRENT_PROJECT_VERSION=* ]] || build_number="${arg#*=}"
+      done
+    fi
+    mkdir -p "$archive"
+    cat >"$archive/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>ApplicationProperties</key><dict>
+    <key>CFBundleIdentifier</key><string>com.example.app</string>
+    <key>CFBundleVersion</key><string>$build_number</string>
+    <key>Team</key><string>ARCHIVETEAM</string>
+  </dict>
+</dict></plist>
+PLIST
+    ;;
+  *" -exportArchive "*)
+    export_path="$(value_after -exportPath "$@")"
+    mkdir -p "$export_path"
+    [[ -n "${STUB_SKIP_IPA:-}" ]] || : >"$export_path/My App.ipa"
+    ;;
+esac
+exit "${STUB_XCODEBUILD_EXIT:-0}"

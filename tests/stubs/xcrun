@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Test double for xcrun: logs "<cwd>|<args>" so tests can check where altool
+# runs (it resolves ./private_keys relative to the working directory).
+set -euo pipefail
+{
+  printf '%s|' "$PWD"
+  printf '%q ' "$@"
+  printf '\n'
+} >>"$TEST_TMP/xcrun.log"
+exit "${STUB_XCRUN_EXIT:-0}"
