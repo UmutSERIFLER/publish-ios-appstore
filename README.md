@@ -305,7 +305,7 @@ permissions:
 | --- | --- |
 | `ipaPath` | Absolute path of the exported `.ipa`. |
 | `archivePath` | Absolute path of the `.xcarchive`, including dSYMs for crash reporting. |
-| `buildNumber` | Build number stamped on the build. |
+| `buildNumber` | Build number (`CFBundleVersion`) read back from the archive, so it is the real one even if the override did not apply. |
 | `gitTag` | Tag pushed for the uploaded commit; empty unless `gitTag` is `true`. |
 
 ## Self-hosted runners

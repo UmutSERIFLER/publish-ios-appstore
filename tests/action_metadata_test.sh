@@ -77,3 +77,13 @@ runs:
 EOF
   assert_fails check_action_metadata "$TEST_TMP/action.yml"
 }
+
+# The input build number is only a request: projects whose Info.plist does not
+# use $(CURRENT_PROJECT_VERSION) keep their own, so report what was archived.
+test_action_build_number_output_comes_from_the_archive() {
+  local value
+  # shellcheck disable=SC2016 # Ruby source, not shell
+  value="$(ruby -ryaml -e 'puts YAML.safe_load(File.read(ARGV[0])).dig("outputs", "buildNumber", "value")' "$ROOT_DIR/action.yml")"
+  # shellcheck disable=SC2016 # literal GitHub expression
+  assert_eq '${{ steps.archive.outputs.buildNumber }}' "$value"
+}

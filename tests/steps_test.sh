@@ -174,6 +174,7 @@ test_archive_stamps_versions_and_authenticates_with_api_key() {
   assert_contains "$log" "-allowProvisioningUpdates -authenticationKeyPath $API_KEY_PATH -authenticationKeyID KEY123 -authenticationKeyIssuerID issuer-uuid"
   assert_contains "$log" "CURRENT_PROJECT_VERSION=57 MARKETING_VERSION=2.1.0 -skipMacroValidation"
   assert_eq "$WORK_DIR/App.xcarchive" "$(step_output archivePath)"
+  assert_eq "57" "$(step_output buildNumber)"
 }
 
 test_archive_omits_marketing_version_and_team_when_not_set() {
@@ -198,6 +199,15 @@ test_archive_warns_when_build_number_is_not_applied() {
   export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION=""
   export STUB_ARCHIVED_BUILD_NUMBER="1"
   assert_contains "$(run_step archive.sh 2>&1)" "::warning::"
+}
+
+test_archive_outputs_the_build_number_it_actually_archived() {
+  use_stubs
+  xcode_env
+  export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION=""
+  export STUB_ARCHIVED_BUILD_NUMBER="1"
+  run_step archive.sh 2>/dev/null
+  assert_eq "1" "$(step_output buildNumber)"
 }
 
 # --- export.sh -------------------------------------------------------------

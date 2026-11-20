@@ -108,8 +108,8 @@ outputs:
     description: 'Absolute path of the .xcarchive.'
     value: ${{ steps.archive.outputs.archivePath }}
   buildNumber:
-    description: 'Build number (CFBundleVersion) stamped on the build.'
-    value: ${{ steps.setup.outputs.buildNumber }}
+    description: 'Build number (CFBundleVersion) read back from the archive.'
+    value: ${{ steps.archive.outputs.buildNumber }}
   gitTag:
     description: 'Git tag pushed for the uploaded commit (empty unless gitTag is true).'
     value: ${{ steps.tag.outputs.gitTag }}

@@ -44,3 +44,5 @@ if [[ "$archived_build_number" != "$BUILD_NUMBER" ]]; then
 fi
 
 set_output archivePath "$archive_path"
+# Report what was archived, not what was requested.
+set_output buildNumber "$archived_build_number"
