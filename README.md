@@ -50,7 +50,8 @@ flowchart TD
 ```
 
 Cleanup (step 8) **always runs**, also when an earlier step fails, so secrets never stay on
-the runner. If any step fails, the steps after it are skipped and the job fails.
+the runner. If it cannot delete something, it still tries the rest, then fails the job and
+names what is left. If any other step fails, the steps after it are skipped and the job fails.
 
 | Step | What happens | Script |
 | --- | --- | --- |

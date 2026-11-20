@@ -318,6 +318,33 @@ test_cleanup_removes_secrets_but_keeps_build_products() {
   assert_file_exists "$WORK_DIR/export/My App.ipa"
 }
 
+# A self-hosted runner must not look clean while it still holds secrets.
+test_cleanup_fails_when_keychain_cannot_be_deleted_but_still_removes_api_key() {
+  use_stubs
+  xcode_env
+  mkdir -p "$WORK_DIR/private_keys" "$TEST_TMP/bin"
+  : >"$API_KEY_PATH"
+  : >"$WORK_DIR/signing.keychain-db"
+  printf '#!/bin/sh\nexit 1\n' >"$TEST_TMP/bin/security"
+  chmod +x "$TEST_TMP/bin/security"
+  local output
+  output="$(PATH="$TEST_TMP/bin:$PATH" run_step cleanup.sh 2>&1)" && return 1
+  assert_contains "$output" "::error::Could not delete keychain"
+  [[ ! -e "$WORK_DIR/private_keys" ]]
+}
+
+test_cleanup_fails_when_api_key_cannot_be_removed() {
+  use_stubs
+  xcode_env
+  mkdir -p "$WORK_DIR/private_keys"
+  : >"$API_KEY_PATH"
+  chmod a-w "$WORK_DIR/private_keys"
+  local status=0
+  run_step cleanup.sh >/dev/null 2>&1 || status=$?
+  chmod u+w "$WORK_DIR/private_keys"
+  [[ $status -ne 0 ]]
+}
+
 test_cleanup_is_a_no_op_without_work_dir() {
   WORK_DIR="" run_step cleanup.sh
 }
