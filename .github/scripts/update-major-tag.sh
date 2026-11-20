@@ -81,10 +81,13 @@ remote_major() {
 
 # Runs are not serialized: a concurrency group keeps only one pending run and
 # drops the others. So the move is a compare-and-swap: push only if the major
-# tag is still what was checked, otherwise fetch and decide again.
+# tag is still what was read, otherwise read everything again.
 for attempt in 1 2 3 4 5; do
   state="$(remote_major)" || fail "Cannot read tags from origin."
-  # Read after the major tag, so the list holds whatever release it is on.
+  # Tags and releases are read after the major tag, so they include whatever
+  # release it is on, even one published after this checkout. The lease stays
+  # the value read above.
+  git fetch -q --tags --force origin || fail "Cannot fetch tags from origin."
   releases="$(list_releases)" || fail "Cannot list GitHub releases; $major was not moved. Re-run later."
   lease=""
   if [[ -n "$state" ]]; then
@@ -109,6 +112,5 @@ for attempt in 1 2 3 4 5; do
     exit 0
   fi
   echo "$major changed during attempt $attempt; checking again."
-  git fetch -q --tags --force origin
 done
 fail "Could not move $major: it kept changing. Re-run this workflow from the $tag tag."

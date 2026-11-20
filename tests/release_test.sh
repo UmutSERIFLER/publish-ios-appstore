@@ -27,6 +27,18 @@ publish_release() {
   esac >>"$TEST_TMP/releases"
 }
 
+# Publishes $1 on a new commit and moves v2 to it from another clone, like a
+# run that finished after this job's checkout. Prints the new commit.
+publish_and_promote_elsewhere() {
+  local other="$TEST_TMP/other"
+  [[ -d "$other" ]] || git clone -q "$TEST_TMP/origin.git" "$other"
+  git -C "$other" commit -q --allow-empty -m "$1"
+  git -C "$other" push -q origin "HEAD:refs/tags/$1"
+  git -C "$other" push -q --force origin "HEAD:refs/tags/v2"
+  echo "$1 false false" >>"$TEST_TMP/releases"
+  git -C "$other" rev-parse HEAD
+}
+
 test_release_points_major_tag_at_newest_release() {
   make_git_repo
   local first second
@@ -132,6 +144,25 @@ test_release_aborts_when_github_releases_cannot_be_read() {
   touch "$TEST_TMP/gh-fail-call-2"
   assert_fails release v2.1.0
   assert_eq "$first" "$(remote_tag_commit v2)"
+}
+
+# The checkout may predate the release v2 is on now; its tag must be fetched
+# before deciding, not reported as "no published release".
+test_release_reads_tags_published_after_checkout() {
+  make_git_repo
+  local first maintenance newer output
+  first="$(git_commit "first")"
+  publish_release v2.0.0 "$first"
+  release v2.0.0 >/dev/null
+  maintenance="$(git_commit "2.1.0 from a maintenance branch")"
+  publish_release v2.1.0 "$maintenance"
+  newer="$(publish_and_promote_elsewhere v2.2.0)"
+  output="$(release v2.1.0 2>&1)" || {
+    printf '%s\n' "$output" >&2
+    return 1
+  }
+  assert_contains "$output" "v2 stays on v2.2.0"
+  assert_eq "$newer" "$(remote_tag_commit v2)"
 }
 
 test_release_of_new_major_keeps_previous_major_tag() {
