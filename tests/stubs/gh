@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Test double for the GitHub CLI. Answers only what update-major-tag.sh asks:
+# `gh release view <tag> --json isDraft,isPrerelease --jq ...`, printing
+# "<isDraft> <isPrerelease>" from $TEST_TMP/releases (one
+# "<tag> <isDraft> <isPrerelease>" line per release), like the real --jq does.
+set -euo pipefail
+
+if [[ "${1:-} ${2:-}" != "release view" ]]; then
+  echo "gh stub: unsupported command: $*" >&2
+  exit 2
+fi
+
+if [[ -f "${TEST_TMP:?}/releases" ]]; then
+  while read -r tag draft prerelease; do
+    if [[ "$tag" == "$3" ]]; then
+      echo "$draft $prerelease"
+      exit 0
+    fi
+  done <"$TEST_TMP/releases"
+fi
+echo "release not found" >&2
+exit 1

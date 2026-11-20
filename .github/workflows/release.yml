@@ -1,15 +1,14 @@
 name: Release
 
-# Publishing a release (with "Publish this Action to the GitHub Marketplace"
-# ticked) runs the full CI, then moves the floating major tag (v2) to it.
+# Publishing a stable release (with "Publish this Action to the GitHub
+# Marketplace" ticked) runs the full CI, then moves the floating major tag (v2)
+# to it. `released` also fires when a prerelease is promoted to a release.
+# To re-run by hand, start it from the release tag (Use workflow from > Tags),
+# so CI tests exactly the commit that gets promoted.
 on:
   release:
-    types: [published]
+    types: [released]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing release tag to point the major tag at, e.g. v2.1.0'
-        required: true
 
 permissions:
   contents: read
@@ -33,6 +32,8 @@ jobs:
           fetch-depth: 0
       - name: Move major version tag
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-          PRERELEASE: ${{ github.event.release.prerelease || false }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          TESTED_COMMIT: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: bash .github/scripts/update-major-tag.sh

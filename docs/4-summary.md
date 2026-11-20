@@ -12,11 +12,12 @@
 - Tagging, in two places:
   - **Action:** `gitTag: true` pushes an annotated tag (default `ios-v{version}-{build}`) for
     the uploaded commit. It reads the values from the archive and never moves an existing tag.
-  - **This repo:** `.github/workflows/release.yml` runs CI on every published release, then
-    moves the floating major tag (`v2`). Prereleases and older hotfixes never move it.
+  - **This repo:** `.github/workflows/release.yml` runs CI on every stable release, then
+    moves the floating major tag (`v2`) forward. Drafts, prereleases and older hotfixes never
+    move it.
 - README rewritten as the Marketplace page, with Mermaid diagrams for the pipeline, signing
   modes, version/build/tag mapping and the release flow.
-- Tests (`make test`): 73 bash tests that stub `xcodebuild`, `xcrun` and use local git
+- Tests (`make test`): bash tests that stub `xcodebuild`, `xcrun`, `gh` and use local git
   remotes, plus one keychain integration test that runs only on CI. CI
   (`.github/workflows/ci.yml`) runs shellcheck and actionlint on Ubuntu and the tests on macOS.
 
@@ -62,6 +63,15 @@
 - **The test runner fails on test files it cannot load** (from PR review). Discovery runs in a
   separate bash process: `set -e` is ignored inside functions called from `if`, and `source`
   returns only the last command's status.
+- **Release promotion is driven by what was tested and released** (second PR review). A
+  manual run must start from the tag, and the script refuses a tag whose commit is not the
+  one CI tested. Draft/prerelease flags come from the Releases API, because a manual run has
+  no release payload. `v2` is compared only with the release it points at, so stray tags
+  cannot block a hotfix; the `gh` CLI preinstalled on runners does the API call.
+- **`buildNumber` output is read back from the archive** (second PR review), so it never
+  reports a number that the project ignored.
+- **`gitTag` checks `origin`** (second PR review): the default checkout has no tags, so re-runs
+  used to fail on push. Same commit is now a no-op, another commit fails clearly.
 - **Not done (PR review):** isolating signing identities that Xcode creates during automatic
   signing on self-hosted runners. Changing the default keychain would race across parallel
   jobs; the README documents it and recommends manual signing on shared Macs.

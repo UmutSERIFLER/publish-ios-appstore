@@ -370,23 +370,27 @@ sequenceDiagram
     participant CI as CI (lint + tests)
     participant T as Git tags
     M->>GH: Publish release v2.1.0<br/>(tick "Publish to GitHub Marketplace")
-    GH->>R: release published
+    GH->>R: release released (not a draft or prerelease)
     R->>CI: shellcheck, actionlint, macOS tests
     CI-->>R: green
     R->>T: move v2 → v2.1.0
     Note over T: workflows using @v2 now run v2.1.0
 ```
 
-- **Prereleases** (e.g. `v2.2.0-rc.1`) never move `v2`.
-- **Older hotfixes:** publishing `v2.0.1` after `v2.1.0` leaves `v2` on `v2.1.0`.
+- **Drafts and prereleases** never move `v2`. Turning a prerelease into a full release does.
+- **Only forward:** `v2` moves only to a release newer than the one it points at, so
+  publishing `v2.0.1` after `v2.1.0` leaves it on `v2.1.0`. Tags that never reached `v2`
+  (a pushed `v2.3.0` without a release, a `v2.2.0` prerelease) do not block a `v2.1.1` hotfix.
 - **New majors:** `v3.0.0` creates `v3` and leaves `v2` where it is.
-- **Manual re-run:** if a release run failed, start the workflow by hand from the Actions tab
-  with the release tag.
+- **Only tested code:** the workflow promotes a tag only if CI ran on that tag's commit.
+- **Manual re-run:** in the Actions tab, run the Release workflow with
+  **Use workflow from → Tags → v2.1.0** (or `gh workflow run release.yml --ref v2.1.0`).
+  Started from a branch, it fails without touching `v2`.
 
 ## Development
 
 ```sh
-make test   # full suite on macOS /bin/bash 3.2; xcodebuild and xcrun are stubbed
+make test   # full suite on macOS /bin/bash 3.2; xcodebuild, xcrun and gh are stubbed
 make lint   # shellcheck + actionlint   (brew install shellcheck actionlint)
 ```
 
