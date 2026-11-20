@@ -19,6 +19,7 @@ tag_env() {
   make_git_repo
   export GITHUB_OUTPUT="$TEST_TMP/github_output" GITHUB_WORKSPACE="$TEST_TMP/repo"
   export ARCHIVE_PATH="$TEST_TMP/App.xcarchive" INPUT_GIT_TAG="true" INPUT_GIT_TAG_NAME="" INPUT_UPLOAD_APP="true"
+  export CONTAINER_PATH="App.xcodeproj"
   : >"$GITHUB_OUTPUT"
   write_archive_info "$ARCHIVE_PATH" "2.1.0" "57"
 }
@@ -109,4 +110,29 @@ test_git_tag_refuses_remote_tag_on_another_commit() {
   local output
   output="$(run_tag_step 2>&1)" && return 1
   assert_contains "$output" "Tag ios-v2.1.0-57 already exists on $first"
+}
+
+# The app can be a second checkout below the workspace (actions/checkout with
+# `path:`); the tag belongs to that repository, not the root one.
+test_git_tag_tags_the_repository_that_holds_the_project() {
+  tag_env
+  local commit
+  commit="$(git_commit "release")"
+  git init -q --bare -b main "$TEST_TMP/root-origin.git"
+  git init -q -b main "$TEST_TMP/ws"
+  git -C "$TEST_TMP/ws" remote add origin "$TEST_TMP/root-origin.git"
+  git -C "$TEST_TMP/ws" commit -q --allow-empty -m "orchestration"
+  git clone -q "$TEST_TMP/origin.git" "$TEST_TMP/ws/ios-app"
+  GITHUB_WORKSPACE="$TEST_TMP/ws" CONTAINER_PATH="ios-app/App.xcworkspace" run_tag_step >/dev/null
+  assert_eq "$commit" "$(remote_tag_commit ios-v2.1.0-57)"
+  assert_eq "" "$(git --git-dir "$TEST_TMP/root-origin.git" tag --list)"
+}
+
+test_git_tag_fails_when_the_project_is_not_in_a_git_checkout() {
+  tag_env
+  git_commit "release" >/dev/null
+  mkdir -p "$TEST_TMP/plain/ios"
+  GITHUB_WORKSPACE="$TEST_TMP/plain" CONTAINER_PATH="ios/App.xcodeproj"
+  export GIT_CEILING_DIRECTORIES="$TEST_TMP"
+  assert_fails run_tag_step
 }

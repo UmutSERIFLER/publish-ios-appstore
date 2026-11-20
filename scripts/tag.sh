@@ -26,9 +26,13 @@ name="${template//\{version\}/$version}"
 name="${name//\{build\}/$build}"
 git check-ref-format "refs/tags/$name" || fail "gitTagName produced an invalid tag name: '$name'."
 
-repo="${GITHUB_WORKSPACE:-$PWD}"
-git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 ||
-  fail "gitTag needs the repository checked out with actions/checkout in $repo."
+# Tag the repository that holds the project: it can be a separate checkout
+# below the workspace (actions/checkout with `path:`). Paths are relative to
+# the workspace, like in every other step.
+cd "${GITHUB_WORKSPACE:-$PWD}"
+project_dir="$(dirname "${CONTAINER_PATH:?}")"
+repo="$(git -C "$project_dir" rev-parse --show-toplevel 2>/dev/null)" ||
+  fail "gitTag needs $project_dir inside a git checkout (actions/checkout)."
 commit="$(git -C "$repo" rev-parse HEAD)"
 
 refuse_to_move() {

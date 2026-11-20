@@ -39,7 +39,17 @@ check_action_metadata() {
       errors << "step #{label} has no shell" unless step["shell"]
       errors << "step #{label} interpolates ${{ }} inside run (script injection); use env" if step["run"].include?("${{")
       step["run"].scan(%r{\$GITHUB_ACTION_PATH/(\S+\.sh)}).flatten.each do |script|
-        errors << "step #{label} runs missing script #{script}" unless File.file?(File.join(root, script))
+        path = File.join(root, script)
+        unless File.file?(path)
+          errors << "step #{label} runs missing script #{script}"
+          next
+        end
+        # Every ${VAR:?} the script requires must come from the step env;
+        # GITHUB_* and RUNNER_* are set by the runner.
+        File.read(path).scan(/\$\{([A-Z_][A-Z0-9_]*):\?/).flatten.uniq.each do |var|
+          next if var.start_with?("GITHUB_", "RUNNER_")
+          errors << "step #{label} does not set #{var} required by #{script}" unless (step["env"] || {}).key?(var)
+        end
       end
     end
 
@@ -59,6 +69,23 @@ check_action_metadata() {
 
 test_action_metadata_is_valid_for_marketplace() {
   check_action_metadata "$ROOT_DIR/action.yml"
+}
+
+test_action_metadata_check_detects_missing_step_env() {
+  cat >"$TEST_TMP/action.yml" <<'EOF'
+name: Example
+description: Example
+author: Someone
+branding: { icon: upload-cloud, color: green }
+runs:
+  using: composite
+  steps:
+    - run: bash "$GITHUB_ACTION_PATH/scripts/tag.sh"
+      shell: bash
+      env:
+        ARCHIVE_PATH: /tmp/App.xcarchive
+EOF
+  assert_fails check_action_metadata "$TEST_TMP/action.yml"
 }
 
 test_action_metadata_check_detects_script_injection() {

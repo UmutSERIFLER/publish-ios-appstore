@@ -204,6 +204,7 @@ runs:
       shell: bash
       env:
         ARCHIVE_PATH: ${{ steps.archive.outputs.archivePath }}
+        CONTAINER_PATH: ${{ steps.setup.outputs.containerPath }}
         INPUT_GIT_TAG: ${{ inputs.gitTag }}
         INPUT_GIT_TAG_NAME: ${{ inputs.gitTagName }}
         INPUT_UPLOAD_APP: ${{ inputs.uploadApp }}

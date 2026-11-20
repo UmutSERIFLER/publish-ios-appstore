@@ -241,8 +241,9 @@ permissions:
           # ...other inputs
 ```
 
-- **What gets tagged:** the version and build come from the archive, so the tag matches what
-  was really uploaded.
+- **What gets tagged:** the checked-out commit of the repository that contains your
+  `workspace`/`project`, also when it is a second checkout (`actions/checkout` with `path:`).
+  The version and build come from the archive, so the tag matches what was really uploaded.
 - **No upload, no tag:** with `uploadApp: false`, no tag is created.
 - **Existing tags are never moved:** the step checks `origin`, so the default shallow checkout
   without tags is enough. If the tag already points at the same commit, the step is a no-op
