@@ -3,6 +3,8 @@
 # `gh release view <tag> --json isDraft,isPrerelease --jq ...`, printing
 # "<isDraft> <isPrerelease>" from $TEST_TMP/releases (one
 # "<tag> <isDraft> <isPrerelease>" line per release), like the real --jq does.
+# If $TEST_TMP/on-release-view-<tag> exists, it runs once first, so a test can
+# change the remote mid-run like a concurrent release would.
 set -euo pipefail
 
 if [[ "${1:-} ${2:-}" != "release view" ]]; then
@@ -10,7 +12,13 @@ if [[ "${1:-} ${2:-}" != "release view" ]]; then
   exit 2
 fi
 
-if [[ -f "${TEST_TMP:?}/releases" ]]; then
+hook="${TEST_TMP:?}/on-release-view-$3"
+if [[ -f "$hook" ]]; then
+  mv "$hook" "$hook.done"
+  sh "$hook.done"
+fi
+
+if [[ -f "$TEST_TMP/releases" ]]; then
   while read -r tag draft prerelease; do
     if [[ "$tag" == "$3" ]]; then
       echo "$draft $prerelease"

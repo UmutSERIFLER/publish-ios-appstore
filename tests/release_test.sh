@@ -95,6 +95,27 @@ test_release_ignores_unreleased_tags_on_the_promoted_commit() {
   assert_eq "$hotfix" "$(remote_tag_commit v2)"
 }
 
+# Runs are not serialized (a concurrency group drops pending runs), so a run
+# that checked v2 before another run moved it must re-check, not overwrite.
+test_release_does_not_overwrite_a_concurrent_promotion() {
+  make_git_repo
+  local first newer older
+  first="$(git_commit "first")"
+  publish_release v2.0.0 "$first"
+  release v2.0.0 >/dev/null
+  newer="$(git_commit "2.2.0")"
+  publish_release v2.2.0 "$newer"
+  older="$(git_commit "2.1.0 from a maintenance branch")"
+  publish_release v2.1.0 "$older"
+  printf 'git --git-dir "%s" update-ref refs/tags/v2 %s\n' "$TEST_TMP/origin.git" "$newer" \
+    >"$TEST_TMP/on-release-view-v2.0.0"
+  local output
+  output="$(release v2.1.0 2>&1)"
+  assert_contains "$output" "v2 changed during attempt 1; checking again."
+  assert_contains "$output" "v2 stays on v2.2.0"
+  assert_eq "$newer" "$(remote_tag_commit v2)"
+}
+
 test_release_of_new_major_keeps_previous_major_tag() {
   make_git_repo
   local first second
@@ -186,6 +207,7 @@ test_release_workflow_promotes_only_the_commit_ci_tested() {
     on = wf.key?(true) ? wf[true] : wf["on"] # YAML 1.1 reads a bare `on` as true
     errors = []
     errors << "trigger on release types [released]" unless on.dig("release", "types") == ["released"]
+    errors << "no concurrency group: GitHub drops pending runs; the script uses a lease" if wf["concurrency"]
     errors << "workflow_dispatch must not take a tag input; run it from the tag" if on["workflow_dispatch"].is_a?(Hash) && on["workflow_dispatch"]["inputs"]
     job = wf.dig("jobs", "update-major-tag")
     errors << "update-major-tag must need ci" unless Array(job["needs"]).include?("ci")

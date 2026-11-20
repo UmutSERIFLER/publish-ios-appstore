@@ -13,9 +13,8 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: release
-  cancel-in-progress: false
+# No concurrency group on purpose: GitHub keeps one pending run per group and
+# drops the rest. update-major-tag.sh moves the tag with a lease instead.
 
 jobs:
   ci:

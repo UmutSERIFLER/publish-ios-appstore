@@ -68,6 +68,19 @@
   one CI tested. Draft/prerelease flags come from the Releases API, because a manual run has
   no release payload. `v2` is compared only with the release it points at, so stray tags
   cannot block a hotfix; the `gh` CLI preinstalled on runners does the API call.
+- **Third PR review:**
+  - Cleanup fails the job when it cannot delete the keychain or the API key; it still tries
+    everything first.
+  - `extraXcodebuildArgs` may span lines (YAML block) and also reaches simulator discovery.
+    Checked on Xcode 27.2: only test-only flags (`-testPlan`, `-enableCodeCoverage`) break
+    discovery, and archive already rejects those.
+  - A bad profile line after a valid one is rejected instead of swallowed by the
+    wrapped-profile fallback.
+  - `gitTag` tags the repository that contains the project, also for a nested checkout. The
+    metadata test now checks that every `${VAR:?}` a step script needs is in its `env`.
+  - The major tag counts only stable published releases on its commit, and moves with
+    `git push --force-with-lease` plus re-check instead of a concurrency group, which
+    GitHub would use to drop pending runs.
 - **`buildNumber` output is read back from the archive** (second PR review), so it never
   reports a number that the project ignored.
 - **`gitTag` checks `origin`** (second PR review): the default checkout has no tags, so re-runs

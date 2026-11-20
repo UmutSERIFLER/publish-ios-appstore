@@ -385,6 +385,8 @@ sequenceDiagram
   (a pushed `v2.3.0` without a release, a `v2.2.0` prerelease) do not block a `v2.1.1` hotfix.
 - **New majors:** `v3.0.0` creates `v3` and leaves `v2` where it is.
 - **Only tested code:** the workflow promotes a tag only if CI ran on that tag's commit.
+- **Parallel releases:** runs are not queued (GitHub would drop all but one pending run).
+  `v2` moves only if it is still where the run last checked it; otherwise the run checks again.
 - **Manual re-run:** in the Actions tab, run the Release workflow with
   **Use workflow from → Tags → v2.1.0** (or `gh workflow run release.yml --ref v2.1.0`).
   Started from a branch, it fails without touching `v2`.

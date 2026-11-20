@@ -61,23 +61,43 @@ promoted_release() {
   done
 }
 
-# Compare with the release the major tag is on now, not with every tag: a
-# pushed tag or prerelease that never reached v2 must not block a hotfix.
-current_commit="$(git rev-parse -q --verify "refs/tags/$major^{commit}" || true)"
-if [[ -n "$current_commit" ]]; then
-  current="$(promoted_release "$current_commit")"
-  [[ -n "$current" ]] ||
-    fail "$major points at $current_commit, which has no published $major.x.y release. Move $major by hand."
-  if [[ "$current" == "$tag" ]]; then
-    echo "$major already points at $tag."
-    exit 0
-  fi
-  if ! is_newer "$tag" "$current"; then
-    echo "::notice::$major stays on $current because $tag is older."
-    exit 0
-  fi
-fi
+# Prints "<ref value> <commit>" of the major tag on origin, or nothing.
+remote_major() {
+  local ref="refs/tags/$major"
+  git ls-remote --tags origin "$ref" "$ref^{}" | awk -v ref="$ref" '
+    $2 == ref { raw = $1 }
+    $2 == ref "^{}" { peeled = $1 }
+    END { if (raw != "") print raw, (peeled != "" ? peeled : raw) }'
+}
 
-git tag -f "$major" "$commit"
-git push --force origin "refs/tags/$major"
-echo "$major now points at $tag ($commit)."
+# Runs are not serialized: a concurrency group keeps only one pending run and
+# drops the others. So the move is a compare-and-swap: push only if the major
+# tag is still what was checked, otherwise fetch and decide again.
+for attempt in 1 2 3 4 5; do
+  state="$(remote_major)" || fail "Cannot read tags from origin."
+  lease=""
+  if [[ -n "$state" ]]; then
+    read -r lease current_commit <<<"$state"
+    # Compare with the release the major tag is on now, not with every tag: a
+    # pushed tag or prerelease that never reached v2 must not block a hotfix.
+    current="$(promoted_release "$current_commit")"
+    [[ -n "$current" ]] ||
+      fail "$major points at $current_commit, which has no published $major.x.y release. Move $major by hand."
+    if [[ "$current" == "$tag" ]]; then
+      echo "$major already points at $tag."
+      exit 0
+    fi
+    if ! is_newer "$tag" "$current"; then
+      echo "::notice::$major stays on $current because $tag is older."
+      exit 0
+    fi
+  fi
+  # An empty lease means "must not exist yet".
+  if git push --force-with-lease="refs/tags/$major:$lease" origin "$commit:refs/tags/$major"; then
+    echo "$major now points at $tag ($commit)."
+    exit 0
+  fi
+  echo "$major changed during attempt $attempt; checking again."
+  git fetch -q --tags --force origin
+done
+fail "Could not move $major: it kept changing. Re-run this workflow from the $tag tag."
