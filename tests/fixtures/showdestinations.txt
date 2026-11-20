@@ -1,0 +1,16 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -showdestinations -project App.xcodeproj -scheme App
+
+	Available destinations for the "App" scheme:
+		{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:00006041-0000000000000001, name:My Mac }
+		{ platform:iOS, arch:arm64, id:00008110-0000000000000002, name:My iPhone }
+		{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
+		{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
+		{ platform:iOS Simulator, arch:arm64, id:25FFA0B1-1C4D-424B-A718-B9066357FF4F, OS:17.5, name:iPad (10th generation) }
+		{ platform:iOS Simulator, arch:arm64, id:7CF75F67-0BBB-4C8F-A59A-45B81D891192, OS:17.5, name:iPhone 15 Pro }
+		{ platform:iOS Simulator, arch:arm64, id:9A0D1E7C-5B7A-4E7B-8C1A-2B3C4D5E6F70, OS:18.10, name:iPhone 16 }
+		{ platform:iOS Simulator, arch:arm64, id:3B1C2D3E-4F50-6172-8394-A5B6C7D8E9F0, OS:18.2, name:iPhone 16 Pro }
+		{ platform:iOS Simulator, arch:arm64, id:444E9223-0E63-458A-B586-3C7B59D7528E, OS:27.2, name:iPad (A16) }
+
+	Ineligible destinations for the "App" scheme:
+		{ platform:iOS Simulator, id:DEADBEEF-0000-0000-0000-000000000000, OS:28.0, name:iPhone 18, error:iOS 28.0 is not installed. }

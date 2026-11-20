@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: shellcheck
+        run: shellcheck -x -S style scripts/*.sh .github/scripts/*.sh tests/*.sh tests/stubs/*
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      # CI=true (set by GitHub) also enables the keychain/signing integration test.
+      - name: Unit and integration tests
+        run: /bin/bash tests/run.sh

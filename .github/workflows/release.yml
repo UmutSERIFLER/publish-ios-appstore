@@ -1,0 +1,38 @@
+name: Release
+
+# Publishing a stable release (with "Publish this Action to the GitHub
+# Marketplace" ticked) runs the full CI, then moves the floating major tag (v2)
+# to it. `released` also fires when a prerelease is promoted to a release.
+# To re-run by hand, start it from the release tag (Use workflow from > Tags),
+# so CI tests exactly the commit that gets promoted.
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# No concurrency group on purpose: GitHub keeps one pending run per group and
+# drops the rest. update-major-tag.sh moves the tag with a lease instead.
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  update-major-tag:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Move major version tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          TESTED_COMMIT: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/update-major-tag.sh

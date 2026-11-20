@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Test double for the GitHub CLI. Answers only what update-major-tag.sh asks:
+# `gh api --paginate repos/{owner}/{repo}/releases... --jq ...`, printing one
+# "<tag> <isDraft> <isPrerelease>" line per release from $TEST_TMP/releases,
+# like the real --jq does.
+# Calls are numbered per run (the test's `release` helper resets the count).
+# Before call N, $TEST_TMP/on-gh-call-N runs once, so a test can change the
+# remote mid-run like a concurrent release would; $TEST_TMP/gh-fail-call-N
+# makes call N fail once, like an API outage.
+set -euo pipefail
+
+count_file="${TEST_TMP:?}/gh-calls"
+call=$(($(cat "$count_file" 2>/dev/null || echo 0) + 1))
+echo "$call" >"$count_file"
+
+hook="$TEST_TMP/on-gh-call-$call"
+if [[ -f "$hook" ]]; then
+  mv "$hook" "$hook.done"
+  sh "$hook.done"
+fi
+if [[ -f "$TEST_TMP/gh-fail-call-$call" ]]; then
+  mv "$TEST_TMP/gh-fail-call-$call" "$TEST_TMP/gh-fail-call-$call.done"
+  echo "gh: Server Error (HTTP 502)" >&2
+  exit 1
+fi
+
+if [[ "${1:-}" != api || "$*" != *"repos/{owner}/{repo}/releases"* ]]; then
+  echo "gh stub: unsupported command: $*" >&2
+  exit 2
+fi
+cat "$TEST_TMP/releases" 2>/dev/null || true
