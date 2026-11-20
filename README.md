@@ -387,6 +387,10 @@ sequenceDiagram
 - **Only tested code:** the workflow promotes a tag only if CI ran on that tag's commit.
 - **Parallel releases:** runs are not queued (GitHub would drop all but one pending run).
   `v2` moves only if it is still where the run last checked it; otherwise the run checks again.
+  Each check fetches tags and lists releases anew, so a release published after the run
+  started is seen.
+- **GitHub API errors** stop the run without touching `v2`; re-run it once GitHub is back.
+  A failed lookup never counts as "no release".
 - **Manual re-run:** in the Actions tab, run the Release workflow with
   **Use workflow from → Tags → v2.1.0** (or `gh workflow run release.yml --ref v2.1.0`).
   Started from a branch, it fails without touching `v2`.

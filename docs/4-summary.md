@@ -81,6 +81,11 @@
   - The major tag counts only stable published releases on its commit, and moves with
     `git push --force-with-lease` plus re-check instead of a concurrency group, which
     GitHub would use to drop pending runs.
+- **Fourth PR review:** releases are read in one paginated `gh api` listing instead of one
+  `gh release view` per tag. Both commands exit 1 for "not found" and for an outage, so only a
+  complete listing can tell a missing release apart from an error; any API error now stops the
+  run. Each attempt fetches tags and lists releases after reading `v2`, so the release `v2` is
+  on is known even if it was published after the checkout.
 - **`buildNumber` output is read back from the archive** (second PR review), so it never
   reports a number that the project ignored.
 - **`gitTag` checks `origin`** (second PR review): the default checkout has no tags, so re-runs
