@@ -7,6 +7,7 @@
 release() {
   local tested="${2:-}"
   [[ -n "$tested" ]] || tested="$(git -C "$TEST_TMP/repo" rev-parse "$1^{commit}" 2>/dev/null || echo unknown)"
+  rm -f "$TEST_TMP/gh-calls"
   (cd "$TEST_TMP/repo" && PATH="$TESTS_DIR/stubs:$PATH" RELEASE_TAG="$1" TESTED_COMMIT="$tested" \
     bash "$ROOT_DIR/.github/scripts/update-major-tag.sh")
 }
@@ -107,13 +108,30 @@ test_release_does_not_overwrite_a_concurrent_promotion() {
   publish_release v2.2.0 "$newer"
   older="$(git_commit "2.1.0 from a maintenance branch")"
   publish_release v2.1.0 "$older"
+  # Call 1 checks v2.1.0 itself; call 2 runs after this run has read v2.
   printf 'git --git-dir "%s" update-ref refs/tags/v2 %s\n' "$TEST_TMP/origin.git" "$newer" \
-    >"$TEST_TMP/on-release-view-v2.0.0"
+    >"$TEST_TMP/on-gh-call-2"
   local output
   output="$(release v2.1.0 2>&1)"
   assert_contains "$output" "v2 changed during attempt 1; checking again."
   assert_contains "$output" "v2 stays on v2.2.0"
   assert_eq "$newer" "$(remote_tag_commit v2)"
+}
+
+# An API error must stop the run, not read as "no release": v2's commit carries
+# v2.0.0 and v2.2.0, and losing v2.2.0 would let v2.1.0 move v2 backward.
+test_release_aborts_when_github_releases_cannot_be_read() {
+  make_git_repo
+  local first maintenance
+  first="$(git_commit "first")"
+  publish_release v2.0.0 "$first"
+  publish_release v2.2.0 "$first"
+  release v2.2.0 >/dev/null
+  maintenance="$(git_commit "2.1.0 from a maintenance branch")"
+  publish_release v2.1.0 "$maintenance"
+  touch "$TEST_TMP/gh-fail-call-2"
+  assert_fails release v2.1.0
+  assert_eq "$first" "$(remote_tag_commit v2)"
 }
 
 test_release_of_new_major_keeps_previous_major_tag() {

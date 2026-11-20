@@ -10,14 +10,23 @@ source "$(dirname "$0")/../../scripts/lib.sh"
 tag="${RELEASE_TAG:?RELEASE_TAG is not set}"
 tested="${TESTED_COMMIT:?TESTED_COMMIT is not set}"
 
-# Prints "<isDraft> <isPrerelease>" for the GitHub release of tag $1.
+# Prints "<tag> <isDraft> <isPrerelease>" for every GitHub release, read in
+# one listing: a tag missing from it has no release. Any API error fails the
+# call, so an outage can never look like a missing release.
+list_releases() {
+  gh api --paginate "repos/{owner}/{repo}/releases?per_page=100" \
+    --jq '.[] | "\(.tag_name) \(.draft) \(.prerelease)"'
+}
+
+# Prints "<isDraft> <isPrerelease>" for tag $1 from $releases; empty if none.
 release_flags() {
-  gh release view "$1" --json isDraft,isPrerelease --jq '"\(.isDraft) \(.isPrerelease)"'
+  awk -v tag="$1" '$1 == tag { print $2, $3; exit }' <<<"$releases"
 }
 
 # A manual dispatch carries no release payload, so always ask the API.
-flags="$(release_flags "$tag")" ||
-  fail "No GitHub release found for $tag. Publish the release first."
+releases="$(list_releases)" || fail "Cannot list GitHub releases; nothing changed. Re-run later."
+flags="$(release_flags "$tag")"
+[[ -n "$flags" ]] || fail "No GitHub release found for $tag. Publish the release first."
 read -r draft prerelease <<<"$flags"
 if is_true "$draft" || is_true "$prerelease"; then
   echo "$tag is a draft or prerelease; the major tag is left unchanged."
@@ -54,7 +63,7 @@ promoted_release() {
     git tag --points-at "$1" --list "$major.*" | grep -E "$semver" |
       sed 's/^v//' | sort -t. -k1,1nr -k2,2nr -k3,3nr
   ); do
-    if [[ "$(release_flags "v$version" 2>/dev/null)" == "false false" ]]; then
+    if [[ "$(release_flags "v$version")" == "false false" ]]; then
       echo "v$version"
       return
     fi
@@ -75,6 +84,8 @@ remote_major() {
 # tag is still what was checked, otherwise fetch and decide again.
 for attempt in 1 2 3 4 5; do
   state="$(remote_major)" || fail "Cannot read tags from origin."
+  # Read after the major tag, so the list holds whatever release it is on.
+  releases="$(list_releases)" || fail "Cannot list GitHub releases; $major was not moved. Re-run later."
   lease=""
   if [[ -n "$state" ]]; then
     read -r lease current_commit <<<"$state"
