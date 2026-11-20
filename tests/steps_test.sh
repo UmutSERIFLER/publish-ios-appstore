@@ -139,6 +139,16 @@ test_run_tests_uses_newest_iphone_simulator() {
     "test -workspace ios/App.xcworkspace -scheme App -destination id=9A0D1E7C-5B7A-4E7B-8C1A-2B3C4D5E6F70"
 }
 
+# Discovery resolves packages too, so it needs options like -scmProvider.
+test_run_tests_passes_extra_args_to_destination_discovery() {
+  use_stubs
+  xcode_env
+  export INPUT_RUN_TESTS="true" INPUT_TEST_DESTINATION=""
+  INPUT_EXTRA_ARGS="-scmProvider system"
+  run_step run-tests.sh
+  assert_contains "$(head -n 1 "$TEST_TMP/xcodebuild.log")" "-showdestinations -workspace ios/App.xcworkspace -scheme App -scmProvider system"
+}
+
 test_run_tests_uses_explicit_destination_and_extra_args() {
   use_stubs
   xcode_env

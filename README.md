@@ -299,7 +299,7 @@ permissions:
 | `exportMethod` | `app-store-connect` | Use `app-store` on Xcode older than 15.3. |
 | `validateApp` | `true` | Validate before uploading. |
 | `uploadApp` | `true` | `false` builds the `.ipa` without uploading it (dry run). |
-| `extraXcodebuildArgs` | | Extra arguments for test and archive, separated by spaces or newlines (a YAML `\|` block works), e.g. `-skipMacroValidation`. Shell quoting is not supported. |
+| `extraXcodebuildArgs` | | Extra arguments for test (including simulator discovery) and archive, separated by spaces or newlines (a YAML `\|` block works), e.g. `-skipMacroValidation` or `-scmProvider system`. Test-only flags such as `-testPlan` are rejected by archive. Shell quoting is not supported. |
 
 ## Outputs
 
