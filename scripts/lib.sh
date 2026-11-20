@@ -159,8 +159,13 @@ decode_profiles() {
   # Splitting must win over joining: two unpadded profiles joined together
   # may still decode, silently dropping the second one.
   decode_profile_lines "$input" "$out_dir" && return 0
+  # Joining is only for a single line-wrapped profile (GNU base64 default),
+  # whose first line alone is never a whole profile. If it is, a later line is
+  # bad, and joining would hide that.
+  if profile_plist "$out_dir/profile-0.mobileprovision" >/dev/null 2>&1; then
+    fail "$invalid"
+  fi
   rm -f "$out_dir"/profile-*.mobileprovision
-  # A single profile stored line-wrapped (GNU base64 default) only decodes whole.
   decode_profile_to "$input" "$out_dir/profile-0.mobileprovision" || fail "$invalid"
 }
 

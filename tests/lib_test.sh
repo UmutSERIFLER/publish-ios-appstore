@@ -142,15 +142,20 @@ $(b64 "$TEST_TMP/widget.mobileprovision")"
   assert_eq "2" "$(find "$TEST_TMP/out" -name '*.mobileprovision' | wc -l | tr -d ' ')"
 }
 
-test_decode_profiles_splits_newline_separated_profiles() {
-  # Size the first profile to a multiple of 3 bytes so its base64 has no "="
-  # padding: then both lines joined also decode, which must not win.
+# Sizes the profile to a multiple of 3 bytes so its base64 has no "="
+# padding: then it still decodes when joined with the next line.
+make_unpadded_profile() {
   local name="App Store App"
   while :; do
-    make_profile "$TEST_TMP/app.mobileprovision" "$name" "UUID-APP" "$TEAM" "$TEAM.com.example.app"
-    [[ $(($(wc -c <"$TEST_TMP/app.mobileprovision") % 3)) -ne 0 ]] || break
+    make_profile "$1" "$name" "UUID-APP" "$TEAM" "$TEAM.com.example.app"
+    [[ $(($(wc -c <"$1") % 3)) -ne 0 ]] || break
     name="${name}X"
   done
+}
+
+test_decode_profiles_splits_newline_separated_profiles() {
+  # Both lines joined also decode, which must not win.
+  make_unpadded_profile "$TEST_TMP/app.mobileprovision"
   make_profile "$TEST_TMP/widget.mobileprovision" "App Store Widget" "UUID-WIDGET" "$TEAM" "$TEAM.com.example.app.widget"
   local input
   input="$(b64 "$TEST_TMP/app.mobileprovision")
@@ -159,6 +164,16 @@ $(b64 "$TEST_TMP/widget.mobileprovision")
   decode_profiles "$input" "$TEST_TMP/out"
   assert_eq "2" "$(find "$TEST_TMP/out" -name '*.mobileprovision' | wc -l | tr -d ' ')"
   assert_eq "UUID-WIDGET" "$(read_profile "$TEST_TMP/out/profile-1.mobileprovision" | cut -f4)"
+}
+
+# Joining is only for one line-wrapped profile: once a line decoded as a whole
+# profile, a later bad line must fail instead of being swallowed by the join.
+test_decode_profiles_rejects_invalid_line_after_a_valid_profile() {
+  make_unpadded_profile "$TEST_TMP/app.mobileprovision"
+  local input
+  input="$(b64 "$TEST_TMP/app.mobileprovision")
+$(printf 'not a profile' | base64)"
+  assert_fails decode_profiles "$input" "$TEST_TMP/out"
 }
 
 test_decode_profiles_rejects_invalid_profile() {
