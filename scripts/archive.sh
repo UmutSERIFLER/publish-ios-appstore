@@ -29,9 +29,9 @@ fi
 if [[ -n "${INPUT_VERSION:-}" ]]; then
   args+=("MARKETING_VERSION=$INPUT_VERSION")
 fi
-if [[ -n "${INPUT_EXTRA_ARGS:-}" ]]; then
-  read -r -a extra_args <<<"$INPUT_EXTRA_ARGS"
-  args+=("${extra_args[@]}")
+split_extra_args "${INPUT_EXTRA_ARGS:-}"
+if ((${#EXTRA_ARGS[@]})); then
+  args+=("${EXTRA_ARGS[@]}")
 fi
 
 xcodebuild "${args[@]}"

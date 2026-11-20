@@ -82,6 +82,14 @@ pick_simulator_id() {
   ' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1 | awk '{ print $2 }'
 }
 
+# Splits extraXcodebuildArgs on any whitespace, newlines of a YAML block
+# included, into the global EXTRA_ARGS array (bash 3.2 has no namerefs).
+split_extra_args() {
+  EXTRA_ARGS=()
+  # read -d '' consumes everything and returns 1 at EOF, which is expected.
+  read -r -d '' -a EXTRA_ARGS <<<"${1:-}" || true
+}
+
 decode_base64() {
   tr -d '[:space:]' | base64 --decode
 }

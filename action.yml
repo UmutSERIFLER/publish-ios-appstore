@@ -96,7 +96,7 @@ inputs:
     required: false
     default: ''
   extraXcodebuildArgs:
-    description: 'Extra space-separated arguments for xcodebuild test/archive, e.g. -skipMacroValidation.'
+    description: 'Extra arguments for xcodebuild test/archive, separated by spaces or newlines (no shell quoting), e.g. -skipMacroValidation.'
     required: false
     default: ''
 

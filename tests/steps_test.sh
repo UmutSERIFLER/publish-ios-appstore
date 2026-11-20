@@ -150,6 +150,15 @@ test_run_tests_uses_explicit_destination_and_extra_args() {
     "-destination platform=iOS\\ Simulator\\,name=iPhone\\ 16 -skipMacroValidation -skipPackagePluginValidation"
 }
 
+test_run_tests_passes_every_line_of_extra_args() {
+  use_stubs
+  xcode_env
+  export INPUT_RUN_TESTS="true" INPUT_TEST_DESTINATION="platform=iOS Simulator,name=iPhone 16"
+  INPUT_EXTRA_ARGS=$'-skipMacroValidation\n-scmProvider system'
+  run_step run-tests.sh
+  assert_contains "$(cat "$TEST_TMP/xcodebuild.log")" "16 -skipMacroValidation -scmProvider system"
+}
+
 test_run_tests_fails_without_iphone_simulator() {
   use_stubs
   xcode_env
@@ -191,6 +200,15 @@ test_archive_passes_team_id_for_automatic_signing() {
   export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION="" INPUT_TEAM_ID="ABCDE12345"
   run_step archive.sh
   assert_contains "$(cat "$TEST_TMP/xcodebuild.log")" "CURRENT_PROJECT_VERSION=57 DEVELOPMENT_TEAM=ABCDE12345"
+}
+
+test_archive_passes_every_line_of_extra_args() {
+  use_stubs
+  xcode_env
+  export INPUT_CONFIGURATION="Release" BUILD_NUMBER="57" INPUT_VERSION=""
+  INPUT_EXTRA_ARGS=$'-skipMacroValidation\n-scmProvider system\n'
+  run_step archive.sh
+  assert_contains "$(cat "$TEST_TMP/xcodebuild.log")" "CURRENT_PROJECT_VERSION=57 -skipMacroValidation -scmProvider system"
 }
 
 test_archive_warns_when_build_number_is_not_applied() {

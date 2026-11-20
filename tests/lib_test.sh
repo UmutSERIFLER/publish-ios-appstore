@@ -106,6 +106,21 @@ test_write_api_key_rejects_garbage() {
   assert_fails write_api_key "not-a-key" "KEY123" "$TEST_TMP/keys"
 }
 
+# --- split_extra_args ------------------------------------------------------
+
+# A YAML block (`extraXcodebuildArgs: |`) puts one flag per line.
+test_split_extra_args_reads_every_line() {
+  split_extra_args $'-skipMacroValidation\n  -scmProvider system\n'
+  assert_eq "3" "${#EXTRA_ARGS[@]}"
+  assert_eq "-scmProvider" "${EXTRA_ARGS[1]}"
+  assert_eq "system" "${EXTRA_ARGS[2]}"
+}
+
+test_split_extra_args_handles_blank_input() {
+  split_extra_args $'  \n'
+  assert_eq "0" "${#EXTRA_ARGS[@]}"
+}
+
 # --- decode_profiles / read_profile ----------------------------------------
 
 test_decode_profiles_accepts_line_wrapped_base64() {
