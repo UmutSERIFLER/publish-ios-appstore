@@ -243,8 +243,9 @@ permissions:
 - **What gets tagged:** the version and build come from the archive, so the tag matches what
   was really uploaded.
 - **No upload, no tag:** with `uploadApp: false`, no tag is created.
-- **Existing tags are never moved:** if the tag already points at the same commit, the step is
-  a no-op. If it points at a different commit, the step fails.
+- **Existing tags are never moved:** the step checks `origin`, so the default shallow checkout
+  without tags is enough. If the tag already points at the same commit, the step is a no-op
+  (re-runs succeed). If it points at a different commit, the step fails.
 - **No workflow loops:** tags pushed with the default `GITHUB_TOKEN` do not start other
   workflows, so an `ios-v*` tag does not trigger your `v*` workflow.
 

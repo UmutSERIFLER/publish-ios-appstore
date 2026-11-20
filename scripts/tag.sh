@@ -31,9 +31,29 @@ git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 ||
   fail "gitTag needs the repository checked out with actions/checkout in $repo."
 commit="$(git -C "$repo" rev-parse HEAD)"
 
-existing="$(git -C "$repo" rev-parse -q --verify "refs/tags/$name^{commit}" || true)"
+refuse_to_move() {
+  fail "Tag $name already exists on $1; it is never moved. Use a different buildNumber or gitTagName."
+}
+
+# actions/checkout fetches no tags by default, so ask origin first. The peeled
+# (^{}) line is the commit of an annotated tag; a lightweight tag has none.
+ref="refs/tags/$name"
+remote_refs="$(git -C "$repo" ls-remote --tags origin "$ref" "$ref^{}")" ||
+  fail "Cannot list tags on origin; keep the actions/checkout credentials."
+remote_commit="$(printf '%s\n' "$remote_refs" | awk -v ref="$ref" '
+  $2 == ref "^{}" { peeled = $1 }
+  $2 == ref { plain = $1 }
+  END { print (peeled != "" ? peeled : plain) }')"
+if [[ -n "$remote_commit" ]]; then
+  [[ "$remote_commit" == "$commit" ]] || refuse_to_move "$remote_commit"
+  set_output gitTag "$name"
+  echo "Tag $name already points at $commit on origin."
+  exit 0
+fi
+
+existing="$(git -C "$repo" rev-parse -q --verify "$ref^{commit}" || true)"
 if [[ -n "$existing" && "$existing" != "$commit" ]]; then
-  fail "Tag $name already exists on $existing; it is never moved. Use a different buildNumber or gitTagName."
+  refuse_to_move "$existing"
 fi
 
 if [[ -z "$existing" ]]; then
@@ -44,7 +64,7 @@ if [[ -z "$existing" ]]; then
   "${git_cmd[@]}" tag -a "$name" -m "Uploaded to App Store Connect: version $version, build $build" "$commit"
 fi
 
-git -C "$repo" push origin "refs/tags/$name" ||
+git -C "$repo" push origin "$ref" ||
   fail "Could not push tag $name. Give the job 'permissions: contents: write' and keep actions/checkout credentials."
 
 set_output gitTag "$name"

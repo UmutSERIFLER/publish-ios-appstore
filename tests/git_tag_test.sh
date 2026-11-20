@@ -80,3 +80,33 @@ test_git_tag_rejects_invalid_tag_names() {
   INPUT_GIT_TAG_NAME="bad name {build}"
   assert_fails run_tag_step
 }
+
+# actions/checkout fetches no tags by default, so a tag pushed by an earlier
+# run exists only on origin.
+push_tag_then_forget_it_locally() {
+  git -C "$TEST_TMP/repo" tag -a "$1" -m "earlier run"
+  git -C "$TEST_TMP/repo" push -q origin "refs/tags/$1"
+  git -C "$TEST_TMP/repo" tag -d "$1" >/dev/null
+}
+
+test_git_tag_keeps_remote_tag_that_already_targets_the_commit() {
+  tag_env
+  git_commit "release" >/dev/null
+  push_tag_then_forget_it_locally ios-v2.1.0-57
+  local before
+  before="$(git --git-dir "$TEST_TMP/origin.git" rev-parse refs/tags/ios-v2.1.0-57)"
+  run_tag_step >/dev/null
+  assert_eq "$before" "$(git --git-dir "$TEST_TMP/origin.git" rev-parse refs/tags/ios-v2.1.0-57)"
+  assert_eq "ios-v2.1.0-57" "$(grep '^gitTag=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
+}
+
+test_git_tag_refuses_remote_tag_on_another_commit() {
+  tag_env
+  local first
+  first="$(git_commit "first")"
+  push_tag_then_forget_it_locally ios-v2.1.0-57
+  git_commit "second" >/dev/null
+  local output
+  output="$(run_tag_step 2>&1)" && return 1
+  assert_contains "$output" "Tag ios-v2.1.0-57 already exists on $first"
+}
