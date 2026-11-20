@@ -80,6 +80,21 @@ test_release_is_not_blocked_by_newer_tags_that_were_never_promoted() {
   assert_eq "$hotfix" "$(remote_tag_commit v2)"
 }
 
+# Same idea when the stray tags sit on the commit v2 already points at.
+test_release_ignores_unreleased_tags_on_the_promoted_commit() {
+  make_git_repo
+  local first hotfix
+  first="$(git_commit "first")"
+  publish_release v2.1.0 "$first"
+  release v2.1.0 >/dev/null
+  push_tag v2.3.0 "$first"
+  publish_release v2.2.0 "$first" prerelease
+  hotfix="$(git_commit "hotfix")"
+  publish_release v2.1.1 "$hotfix"
+  release v2.1.1 >/dev/null
+  assert_eq "$hotfix" "$(remote_tag_commit v2)"
+}
+
 test_release_of_new_major_keeps_previous_major_tag() {
   make_git_repo
   local first second

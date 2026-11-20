@@ -10,8 +10,13 @@ source "$(dirname "$0")/../../scripts/lib.sh"
 tag="${RELEASE_TAG:?RELEASE_TAG is not set}"
 tested="${TESTED_COMMIT:?TESTED_COMMIT is not set}"
 
+# Prints "<isDraft> <isPrerelease>" for the GitHub release of tag $1.
+release_flags() {
+  gh release view "$1" --json isDraft,isPrerelease --jq '"\(.isDraft) \(.isPrerelease)"'
+}
+
 # A manual dispatch carries no release payload, so always ask the API.
-flags="$(gh release view "$tag" --json isDraft,isPrerelease --jq '"\(.isDraft) \(.isPrerelease)"')" ||
+flags="$(release_flags "$tag")" ||
   fail "No GitHub release found for $tag. Publish the release first."
 read -r draft prerelease <<<"$flags"
 if is_true "$draft" || is_true "$prerelease"; then
@@ -41,17 +46,28 @@ is_newer() {
   return 1
 }
 
+# Newest stable, published vN.x.y release on commit $1; empty if none. Plain
+# tags and prereleases on the same commit never count as promoted.
+promoted_release() {
+  local version
+  for version in $(
+    git tag --points-at "$1" --list "$major.*" | grep -E "$semver" |
+      sed 's/^v//' | sort -t. -k1,1nr -k2,2nr -k3,3nr
+  ); do
+    if [[ "$(release_flags "v$version" 2>/dev/null)" == "false false" ]]; then
+      echo "v$version"
+      return
+    fi
+  done
+}
+
 # Compare with the release the major tag is on now, not with every tag: a
 # pushed tag or prerelease that never reached v2 must not block a hotfix.
 current_commit="$(git rev-parse -q --verify "refs/tags/$major^{commit}" || true)"
 if [[ -n "$current_commit" ]]; then
-  current="$(
-    git tag --points-at "$current_commit" --list "$major.*" | grep -E "$semver" |
-      sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1
-  )" || true
+  current="$(promoted_release "$current_commit")"
   [[ -n "$current" ]] ||
-    fail "$major points at $current_commit, which has no $major.x.y tag. Move $major by hand."
-  current="v$current"
+    fail "$major points at $current_commit, which has no published $major.x.y release. Move $major by hand."
   if [[ "$current" == "$tag" ]]; then
     echo "$major already points at $tag."
     exit 0
